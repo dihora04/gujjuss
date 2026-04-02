@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - balance: number (required, >= 0)
+    //   - role: string (required, 'user' or 'admin')
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: services
+    // Document ID: serviceId
+    // Fields:
+    //   - name: string (required)
+    //   - category: string (required)
+    //   - pricePer1000: number (required)
+    //   - minQuantity: number (required)
+    //   - maxQuantity: number (required)
+    //   - description: string (optional)
+    //
+    // Collection: orders
+    // Document ID: orderId
+    // Fields:
+    //   - userId: string (required)
+    //   - serviceId: string (required)
+    //   - serviceName: string (required)
+    //   - link: string (required)
+    //   - quantity: number (required)
+    //   - charge: number (required)
+    //   - status: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: payments
+    // Document ID: paymentId
+    // Fields:
+    //   - userId: string (required)
+    //   - amount: number (required)
+    //   - method: string (required)
+    //   - status: string (required)
+    //   - transactionId: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "dihora04@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'balance', 'role', 'createdAt']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.balance is number && data.balance >= 0 &&
+             data.role in ['user', 'admin'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['userId', 'serviceId', 'serviceName', 'link', 'quantity', 'charge', 'status', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.serviceId is string &&
+             data.link is string && data.link.size() > 0 &&
+             data.quantity is number && data.quantity > 0 &&
+             data.charge is number && data.charge >= 0 &&
+             data.status in ['pending', 'processing', 'completed', 'partial', 'canceled'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['userId', 'amount', 'method', 'status', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.amount is number && data.amount > 0 &&
+             data.method is string &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user' && request.resource.data.balance == 0;
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']) && isValidUser(request.resource.data));
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPayment(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAdmin();
+    }
+  }
+}

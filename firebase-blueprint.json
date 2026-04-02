@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and balance information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "balance": { "type": "number" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "balance", "role"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "SMM service details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "pricePer1000": { "type": "number" },
+        "minQuantity": { "type": "number" },
+        "maxQuantity": { "type": "number" },
+        "description": { "type": "string" },
+        "providerId": { "type": "string" },
+        "providerServiceId": { "type": "string" }
+      },
+      "required": ["name", "category", "pricePer1000", "minQuantity", "maxQuantity"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "SMM order details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "link": { "type": "string" },
+        "quantity": { "type": "number" },
+        "charge": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "partial", "canceled"] },
+        "externalOrderId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "serviceId", "link", "quantity", "charge", "status"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment transaction details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "transactionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "method", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data."
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Available SMM services."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "User orders."
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment transactions."
+    }
+  }
+}
