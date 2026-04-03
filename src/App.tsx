@@ -30,7 +30,7 @@ import {
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './lib/firebase';
-import { signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth, UserProfile } from './hooks/useAuth';
 import { cn, formatCurrency, formatDate } from './lib/utils';
 import { 
@@ -43,6 +43,7 @@ import {
   serverTimestamp,
   updateDoc,
   doc,
+  setDoc,
   getDocs,
   limit
 } from 'firebase/firestore';
@@ -153,13 +154,41 @@ const Sidebar = ({ profile }: { profile: UserProfile | null }) => {
 // --- Pages ---
 
 const Login = () => {
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
+  const [isSignup, setIsSignup] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      await signInWithPopup(auth, provider);
-      toast.success('Welcome to Gujju SMM!');
-    } catch (error) {
-      toast.error('Login failed. Please try again.');
+      if (isSignup) {
+        if (!displayName) {
+          toast.error('Please enter your name');
+          setLoading(false);
+          return;
+        }
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Profile creation is handled by useAuth hook, but we update the displayName
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: displayName,
+          balance: 0,
+          role: 'user',
+          createdAt: serverTimestamp(),
+        });
+        toast.success('Account created successfully!');
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+        toast.success('Welcome back!');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,18 +205,65 @@ const Login = () => {
             <TrendingUp className="text-white w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Gujju SMM</h1>
-          <p className="text-slate-400">Boost your social presence instantly</p>
+          <p className="text-slate-400">{isSignup ? 'Create your account' : 'Welcome back'}</p>
         </div>
 
-        <button
-          onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-3 bg-white text-slate-900 py-4 rounded-2xl font-bold hover:bg-slate-100 transition-all active:scale-95 shadow-xl"
-        >
-          <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-          Continue with Google
-        </button>
+        <form onSubmit={handleAuth} className="space-y-4">
+          {isSignup && (
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-300">Full Name</label>
+              <input 
+                type="text"
+                required
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="John Doe"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-300">Email / Username</label>
+            <input 
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-300">Password</label>
+            <input 
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+          </div>
 
-        <div className="mt-8 text-center">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 shadow-xl disabled:opacity-50 mt-4"
+          >
+            {loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Login')}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => setIsSignup(!isSignup)}
+            className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+          >
+            {isSignup ? 'Already have an account? Login' : "Don't have an account? Sign up"}
+          </button>
+        </div>
+
+        <div className="mt-8 text-center border-t border-slate-800 pt-6">
           <p className="text-xs text-slate-500">
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </p>
@@ -623,19 +699,30 @@ const AddBalance = ({ profile }: { profile: UserProfile }) => {
 const AdminPanel = ({ profile }: { profile: UserProfile }) => {
   const [payments, setPayments] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'payments' | 'users'>('payments');
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [newBalance, setNewBalance] = useState<number>(0);
+  const [newRole, setNewRole] = useState<'user' | 'admin'>('user');
 
   useEffect(() => {
-    const q = query(collection(db, 'payments'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qPayments = query(collection(db, 'payments'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+    const unsubPayments = onSnapshot(qPayments, (snapshot) => {
       setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubscribe();
+
+    const qUsers = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const unsubUsers = onSnapshot(qUsers, (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubPayments();
+      unsubUsers();
+    };
   }, []);
 
   const approvePayment = async (payment: any) => {
     try {
-      // 1. Update user balance
-      const userRef = doc(db, 'users', payment.userId);
       const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', payment.userId)));
       if (!userDoc.empty) {
         const userData = userDoc.docs[0].data();
@@ -644,13 +731,26 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
         });
       }
 
-      // 2. Update payment status
       await updateDoc(doc(db, 'payments', payment.id), {
         status: 'approved'
       });
       toast.success('Payment approved!');
     } catch (error) {
       toast.error('Approval failed');
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    try {
+      await updateDoc(doc(db, 'users', editingUser.id), {
+        balance: newBalance,
+        role: newRole
+      });
+      toast.success('User updated successfully!');
+      setEditingUser(null);
+    } catch (error) {
+      toast.error('Failed to update user');
     }
   };
 
@@ -661,45 +761,164 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
         <p className="text-slate-400">Manage your SMM empire.</p>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          <Wallet className="w-5 h-5 text-blue-500" /> Pending Payments
-        </h3>
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-slate-800/50 border-b border-slate-800">
-              <tr>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">User ID</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Amount</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Method</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {payments.map(p => (
-                <tr key={p.id}>
-                  <td className="px-6 py-4 text-sm text-slate-400 font-mono">{p.userId.slice(0, 8)}...</td>
-                  <td className="px-6 py-4 text-sm font-bold text-white">{formatCurrency(p.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-slate-300">{p.method}</td>
-                  <td className="px-6 py-4">
-                    <button 
-                      onClick={() => approvePayment(p)}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Approve
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {payments.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No pending payments.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="flex gap-4 border-b border-slate-800">
+        <button 
+          onClick={() => setActiveTab('payments')}
+          className={cn(
+            "pb-4 px-2 font-bold transition-all border-b-2",
+            activeTab === 'payments' ? "border-blue-500 text-blue-500" : "border-transparent text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Payments ({payments.length})
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')}
+          className={cn(
+            "pb-4 px-2 font-bold transition-all border-b-2",
+            activeTab === 'users' ? "border-blue-500 text-blue-500" : "border-transparent text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Users ({users.length})
+        </button>
       </div>
+
+      {editingUser && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl"
+          >
+            <h3 className="text-xl font-bold text-white mb-6">Edit User: {editingUser.displayName}</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-300">Balance (INR)</label>
+                <input 
+                  type="number"
+                  value={newBalance}
+                  onChange={(e) => setNewBalance(Number(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-300">Role</label>
+                <select 
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as 'user' | 'admin')}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={() => setEditingUser(null)}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleUpdateUser}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {activeTab === 'payments' ? (
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-blue-500" /> Pending Payments
+          </h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <table className="w-full text-left">
+              <thead className="bg-slate-800/50 border-b border-slate-800">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">User ID</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Amount</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Method</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {payments.map(p => (
+                  <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-6 py-4 text-sm text-slate-400 font-mono">{p.userId.slice(0, 8)}...</td>
+                    <td className="px-6 py-4 text-sm font-bold text-white">{formatCurrency(p.amount)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-300">{p.method}</td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => approvePayment(p)}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Approve
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {payments.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No pending payments.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <UserIcon className="w-5 h-5 text-indigo-500" /> Registered Users
+          </h3>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <table className="w-full text-left">
+              <thead className="bg-slate-800/50 border-b border-slate-800">
+                <tr>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Name</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Email</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Balance</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Role</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {users.map(u => (
+                  <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-6 py-4 text-sm font-bold text-white">{u.displayName || 'N/A'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-400">{u.email}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-blue-400">{formatCurrency(u.balance)}</td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                        u.role === 'admin' ? "bg-purple-500/10 text-purple-500 border border-purple-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-500/20"
+                      )}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => {
+                          setEditingUser(u);
+                          setNewBalance(u.balance);
+                          setNewRole(u.role);
+                        }}
+                        className="text-blue-400 hover:text-blue-300 text-xs font-bold"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

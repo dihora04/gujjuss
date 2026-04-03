@@ -22,15 +22,18 @@ export function useAuth() {
       if (firebaseUser) {
         setUser(firebaseUser);
         
-        // Fetch or create user profile
+        // Fetch user profile
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (userDoc.exists()) {
           setProfile(userDoc.data() as UserProfile);
         } else {
+          // Profile doesn't exist yet. 
+          // We'll wait for the signup logic to create it, 
+          // or create a default one if it's somehow missing.
           const newProfile: UserProfile = {
             uid: firebaseUser.uid,
             email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || '',
+            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
             balance: 0,
             role: 'user',
             createdAt: serverTimestamp(),
