@@ -160,7 +160,6 @@ const Sidebar = ({ profile }: { profile: UserProfile | null }) => {
 // --- Pages ---
 
 const Login = () => {
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleAdminLogin = async () => {
@@ -175,22 +174,13 @@ const Login = () => {
     }
   };
 
-  const handleUserLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      toast.error('Please enter your email or username');
-      return;
-    }
+  const handleUserLogin = async () => {
     setLoading(true);
     try {
-      // We'll try to login with a default password if none is provided, 
-      // or assume the user knows their password if we kept the field.
-      // But the user asked to REMOVE it. So we use a default one.
-      // Note: In a real app, this is insecure. This is for demo/portal purposes.
-      await signInWithEmailAndPassword(auth, email, 'user123456');
-      toast.success('Welcome back!');
+      await signInWithEmailAndPassword(auth, 'user@example.com', 'user123456');
+      toast.success('Welcome back, Demo User!');
     } catch (error: any) {
-      toast.error('Login failed. Ensure your account exists and uses the default password.');
+      toast.error('User login failed. Please check if demo user is bootstrapped.');
     } finally {
       setLoading(false);
     }
@@ -209,61 +199,38 @@ const Login = () => {
             <TrendingUp className="text-white w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Gujju SMM</h1>
-          <p className="text-slate-400">Select your login method</p>
+          <p className="text-slate-400">Demo Portal - Select Login</p>
         </div>
 
         <div className="space-y-6">
           <button
             onClick={handleAdminLogin}
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-3"
+            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-bold py-6 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-3 group"
           >
-            <ShieldCheck className="w-6 h-6" />
-            Login as Admin
+            <ShieldCheck className="w-8 h-8 group-hover:scale-110 transition-transform" />
+            <div className="text-left">
+              <div className="text-lg">Login as Admin</div>
+              <div className="text-xs font-normal text-indigo-200 opacity-70">Full control & user management</div>
+            </div>
           </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-800"></div>
+          <button
+            onClick={handleUserLogin}
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold py-6 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-3 group"
+          >
+            <UserIcon className="w-8 h-8 group-hover:scale-110 transition-transform" />
+            <div className="text-left">
+              <div className="text-lg">Login as Demo User</div>
+              <div className="text-xs font-normal text-blue-200 opacity-70">Place orders & track status</div>
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-slate-900 px-2 text-slate-500 font-bold">Or Login as User</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleUserLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-300">User Email</label>
-              <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input 
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
-            >
-              {loading ? 'Logging in...' : (
-                <>
-                  Login as User
-                  <TrendingUp className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
+          </button>
         </div>
 
         <div className="mt-8 pt-8 border-t border-slate-800 text-center">
           <p className="text-slate-500 text-sm">
-            Admin can create users from the portal.
+            This is a demo portal. No registration required.
           </p>
         </div>
       </motion.div>
@@ -397,7 +364,7 @@ const NewOrder = ({ profile }: { profile: UserProfile }) => {
       return;
     }
 
-    if (profile.balance < charge) {
+    if (profile.balance < charge && profile.role !== 'admin') {
       toast.error('Insufficient balance!');
       return;
     }
