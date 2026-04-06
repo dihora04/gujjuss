@@ -33,31 +33,44 @@ async function bootstrapDemoAccounts() {
 
   for (const account of accounts) {
     try {
+      let userRecord;
       try {
-        await auth.getUserByEmail(account.email);
-        console.log(`User ${account.email} already exists.`);
+        userRecord = await auth.getUserByEmail(account.email);
+        console.log(`User ${account.email} already exists in Auth.`);
       } catch (error: any) {
         if (error.code === 'auth/user-not-found') {
-          console.log(`Creating user ${account.email}...`);
-          const userRecord = await auth.createUser({
+          console.log(`Creating user ${account.email} in Auth...`);
+          userRecord = await auth.createUser({
             email: account.email,
             password: account.password,
             displayName: account.displayName,
           });
-
-          await db.collection("users").doc(userRecord.uid).set({
-            uid: userRecord.uid,
-            email: account.email,
-            username: account.username,
-            displayName: account.displayName,
-            balance: account.balance,
-            role: account.role,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-          console.log(`User ${account.email} created successfully.`);
+          console.log(`User ${account.email} created in Auth.`);
         } else {
           throw error;
         }
+      }
+
+      // Ensure Firestore profile exists
+      const userDoc = await db.collection("users").doc(userRecord.uid).get();
+      if (!userDoc.exists) {
+        console.log(`Creating Firestore profile for ${account.email}...`);
+        await db.collection("users").doc(userRecord.uid).set({
+          uid: userRecord.uid,
+          email: account.email,
+          username: account.username,
+          displayName: account.displayName,
+          balance: account.balance,
+          role: account.role,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`Firestore profile for ${account.email} created.`);
+      } else {
+        // Update balance if it's a demo account to ensure it's always ready
+        await db.collection("users").doc(userRecord.uid).update({
+          balance: account.balance
+        });
+        console.log(`Firestore profile for ${account.email} updated with demo balance.`);
       }
     } catch (error) {
       console.error(`Error bootstrapping ${account.email}:`, error);

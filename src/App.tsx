@@ -13,25 +13,19 @@ import {
   PlusCircle, 
   History, 
   Wallet, 
-  Settings, 
   LogOut, 
-  Menu, 
-  X,
   ShieldCheck,
-  MessageSquare,
-  Home,
-  User as UserIcon,
   TrendingUp,
-  Package,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
+  User as UserIcon,
   Instagram,
   Youtube,
   Facebook,
+  Home,
+  MessageSquare,
+  Package,
+  Clock,
   Twitter,
-  Send,
-  Users
+  CheckCircle2
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -165,6 +159,8 @@ const Login = () => {
   const handleAdminLogin = async () => {
     setLoading(true);
     try {
+      // Ensure clean state for demo
+      await signOut(auth);
       await signInWithEmailAndPassword(auth, 'dihora04@gmail.com', 'admin123456');
       toast.success('Welcome back, Admin!');
     } catch (error: any) {
@@ -177,6 +173,8 @@ const Login = () => {
   const handleUserLogin = async () => {
     setLoading(true);
     try {
+      // Ensure clean state for demo
+      await signOut(auth);
       await signInWithEmailAndPassword(auth, 'user@example.com', 'user123456');
       toast.success('Welcome back, Demo User!');
     } catch (error: any) {
@@ -502,11 +500,17 @@ const OrderHistory = ({ profile }: { profile: UserProfile }) => {
   useEffect(() => {
     const q = query(
       collection(db, 'orders'), 
-      where('userId', '==', profile.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', profile.uid)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort in memory to avoid needing a composite index for the demo
+      data.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toMillis?.() || 0;
+        const dateB = b.createdAt?.toMillis?.() || 0;
+        return dateB - dateA;
+      });
+      setOrders(data);
     }, (error) => {
       if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'orders');
     });
