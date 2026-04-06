@@ -25,7 +25,13 @@ import {
   Package,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Instagram,
+  Youtube,
+  Facebook,
+  Twitter,
+  Send,
+  Users
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -154,37 +160,16 @@ const Sidebar = ({ profile }: { profile: UserProfile | null }) => {
 // --- Pages ---
 
 const Login = () => {
-  const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (isSignup) {
-        if (!displayName) {
-          toast.error('Please enter your name');
-          setLoading(false);
-          return;
-        }
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Profile creation is handled by useAuth hook, but we update the displayName
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          uid: userCredential.user.uid,
-          email: userCredential.user.email,
-          displayName: displayName,
-          balance: 0,
-          role: 'user',
-          createdAt: serverTimestamp(),
-        });
-        toast.success('Account created successfully!');
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        toast.success('Welcome back!');
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      toast.success('Welcome back!');
     } catch (error: any) {
       toast.error(error.message || 'Authentication failed');
     } finally {
@@ -205,67 +190,56 @@ const Login = () => {
             <TrendingUp className="text-white w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Gujju SMM</h1>
-          <p className="text-slate-400">{isSignup ? 'Create your account' : 'Welcome back'}</p>
+          <p className="text-slate-400">Admin & User Portal Login</p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {isSignup && (
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-300">Full Name</label>
-              <input 
-                type="text"
-                required
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="John Doe"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
-          )}
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-300">Email / Username</label>
-            <input 
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-            />
+            <div className="relative">
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <input 
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-300">Password</label>
-            <input 
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-            />
+            <div className="relative">
+              <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <input 
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 shadow-xl disabled:opacity-50 mt-4"
+            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 mt-4"
           >
-            {loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Login')}
+            {loading ? 'Logging in...' : (
+              <>
+                Login to Dashboard
+                <TrendingUp className="w-5 h-5" />
+              </>
+            )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button 
-            onClick={() => setIsSignup(!isSignup)}
-            className="text-sm text-blue-400 hover:text-blue-300 font-medium"
-          >
-            {isSignup ? 'Already have an account? Login' : "Don't have an account? Sign up"}
-          </button>
-        </div>
-
-        <div className="mt-8 text-center border-t border-slate-800 pt-6">
-          <p className="text-xs text-slate-500">
-            By continuing, you agree to our Terms of Service and Privacy Policy.
+        <div className="mt-8 pt-8 border-t border-slate-800 text-center">
+          <p className="text-slate-500 text-sm">
+            Contact administrator to create an account.
           </p>
         </div>
       </motion.div>
@@ -343,17 +317,19 @@ const Dashboard = ({ profile }: { profile: UserProfile }) => {
         <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: '📸', label: 'Instagram', color: 'from-pink-500 to-rose-500' },
-            { icon: '🎥', label: 'YouTube', color: 'from-red-500 to-orange-500' },
-            { icon: '👥', label: 'Facebook', color: 'from-blue-600 to-indigo-600' },
-            { icon: '🐦', label: 'Twitter', color: 'from-sky-400 to-blue-400' },
+            { label: 'Instagram', icon: <Instagram className="w-8 h-8 text-pink-500" />, color: 'from-pink-500 to-rose-500' },
+            { label: 'YouTube', icon: <Youtube className="w-8 h-8 text-red-500" />, color: 'from-red-500 to-orange-500' },
+            { label: 'Facebook', icon: <Facebook className="w-8 h-8 text-blue-600" />, color: 'from-blue-600 to-indigo-600' },
+            { label: 'Twitter', icon: <Twitter className="w-8 h-8 text-sky-400" />, color: 'from-sky-400 to-blue-400' },
           ].map((item) => (
             <Link 
               key={item.label}
               to="/new-order"
-              className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-slate-800/50 hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
+              className="flex flex-col items-center gap-3 p-6 rounded-3xl bg-slate-800/50 hover:bg-slate-800 transition-all border border-transparent hover:border-slate-700 group"
             >
-              <span className="text-3xl">{item.icon}</span>
+              <div className="p-3 rounded-2xl bg-slate-900 group-hover:scale-110 transition-transform shadow-lg">
+                {item.icon}
+              </div>
               <span className="text-sm font-bold text-white">{item.label}</span>
             </Link>
           ))}
@@ -373,14 +349,14 @@ const NewOrder = ({ profile }: { profile: UserProfile }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchServices = async () => {
-      const res = await fetch('/api/smm/services');
-      const data = await res.json();
+    const q = query(collection(db, 'services'), orderBy('category', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setServices(data);
       const cats = Array.from(new Set(data.map((s: any) => s.category))) as string[];
       setCategories(cats);
-    };
-    fetchServices();
+    });
+    return () => unsubscribe();
   }, []);
 
   const filteredServices = services.filter(s => s.category === selectedCategory);
@@ -699,10 +675,31 @@ const AddBalance = ({ profile }: { profile: UserProfile }) => {
 const AdminPanel = ({ profile }: { profile: UserProfile }) => {
   const [payments, setPayments] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'payments' | 'users'>('payments');
+  const [services, setServices] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'payments' | 'users' | 'services'>('payments');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    email: '',
+    password: '',
+    displayName: '',
+    username: '',
+    balance: 0,
+    role: 'user' as 'user' | 'admin'
+  });
   const [newBalance, setNewBalance] = useState<number>(0);
   const [newRole, setNewRole] = useState<'user' | 'admin'>('user');
+
+  // Service editing state
+  const [editingService, setEditingService] = useState<any>(null);
+  const [serviceForm, setServiceForm] = useState({
+    name: '',
+    category: '',
+    rate: 0,
+    min: 10,
+    max: 10000,
+    description: ''
+  });
 
   useEffect(() => {
     const qPayments = query(collection(db, 'payments'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
@@ -715,11 +712,49 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    const qServices = query(collection(db, 'services'), orderBy('category', 'asc'));
+    const unsubServices = onSnapshot(qServices, (snapshot) => {
+      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     return () => {
       unsubPayments();
       unsubUsers();
+      unsubServices();
     };
   }, []);
+
+  const handleCreateUser = async () => {
+    if (!newUserForm.email || !newUserForm.password || !newUserForm.username) {
+      toast.error('Please fill required fields');
+      return;
+    }
+    try {
+      // Note: Admin creating user via Firebase Auth requires Admin SDK or a backend endpoint.
+      // Since we are in a sandbox, we'll simulate account creation by adding to Firestore.
+      // In a real app, you'd use a Cloud Function or Admin SDK.
+      // For this demo, we'll use a mock approach or assume the admin can use the signup logic if enabled.
+      // BUT the user asked for ONLY portal saving.
+      
+      // We'll use a dedicated API route for this to handle Auth creation on the server side.
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUserForm)
+      });
+      
+      if (res.ok) {
+        toast.success('User created successfully!');
+        setIsCreatingUser(false);
+        setNewUserForm({ email: '', password: '', displayName: '', username: '', balance: 0, role: 'user' });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to create user');
+      }
+    } catch (error) {
+      toast.error('Error creating user');
+    }
+  };
 
   const approvePayment = async (payment: any) => {
     try {
@@ -754,18 +789,34 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
     }
   };
 
+  const handleSaveService = async () => {
+    try {
+      if (editingService?.id) {
+        await updateDoc(doc(db, 'services', editingService.id), serviceForm);
+        toast.success('Service updated!');
+      } else {
+        await addDoc(collection(db, 'services'), serviceForm);
+        toast.success('Service added!');
+      }
+      setEditingService(null);
+      setServiceForm({ name: '', category: '', rate: 0, min: 10, max: 10000, description: '' });
+    } catch (error) {
+      toast.error('Failed to save service');
+    }
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-bold text-white">Admin Panel</h2>
         <p className="text-slate-400">Manage your SMM empire.</p>
       </div>
 
-      <div className="flex gap-4 border-b border-slate-800">
+      <div className="flex gap-4 border-b border-slate-800 overflow-x-auto no-scrollbar">
         <button 
           onClick={() => setActiveTab('payments')}
           className={cn(
-            "pb-4 px-2 font-bold transition-all border-b-2",
+            "pb-4 px-2 font-bold transition-all border-b-2 whitespace-nowrap",
             activeTab === 'payments' ? "border-blue-500 text-blue-500" : "border-transparent text-slate-500 hover:text-slate-300"
           )}
         >
@@ -774,11 +825,20 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
         <button 
           onClick={() => setActiveTab('users')}
           className={cn(
-            "pb-4 px-2 font-bold transition-all border-b-2",
+            "pb-4 px-2 font-bold transition-all border-b-2 whitespace-nowrap",
             activeTab === 'users' ? "border-blue-500 text-blue-500" : "border-transparent text-slate-500 hover:text-slate-300"
           )}
         >
           Users ({users.length})
+        </button>
+        <button 
+          onClick={() => setActiveTab('services')}
+          className={cn(
+            "pb-4 px-2 font-bold transition-all border-b-2 whitespace-nowrap",
+            activeTab === 'services' ? "border-blue-500 text-blue-500" : "border-transparent text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Services ({services.length})
         </button>
       </div>
 
@@ -830,92 +890,328 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
         </div>
       )}
 
-      {activeTab === 'payments' ? (
+      {activeTab === 'payments' && (
         <div className="space-y-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <Wallet className="w-5 h-5 text-blue-500" /> Pending Payments
           </h3>
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-            <table className="w-full text-left">
-              <thead className="bg-slate-800/50 border-b border-slate-800">
-                <tr>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">User ID</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Amount</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Method</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {payments.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 text-sm text-slate-400 font-mono">{p.userId.slice(0, 8)}...</td>
-                    <td className="px-6 py-4 text-sm font-bold text-white">{formatCurrency(p.amount)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-300">{p.method}</td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => approvePayment(p)}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
-                      >
-                        Approve
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {payments.length === 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-800/50 border-b border-slate-800">
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No pending payments.</td>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">User ID</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Amount</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Method</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {payments.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4 text-sm text-slate-400 font-mono">{p.userId.slice(0, 8)}...</td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">{formatCurrency(p.amount)}</td>
+                      <td className="px-6 py-4 text-sm text-slate-300">{p.method}</td>
+                      <td className="px-6 py-4">
+                        <button 
+                          onClick={() => approvePayment(p)}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                        >
+                          Approve
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {payments.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No pending payments.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'users' && (
         <div className="space-y-4">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <UserIcon className="w-5 h-5 text-indigo-500" /> Registered Users
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <UserIcon className="w-5 h-5 text-indigo-500" /> Registered Users
+            </h3>
+            <button 
+              onClick={() => setIsCreatingUser(true)}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" /> Create User
+            </button>
+          </div>
+
+          {isCreatingUser && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl"
+              >
+                <h3 className="text-xl font-bold text-white mb-6">Create New User</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Full Name</label>
+                    <input 
+                      type="text"
+                      value={newUserForm.displayName}
+                      onChange={(e) => setNewUserForm({...newUserForm, displayName: e.target.value})}
+                      placeholder="John Doe"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Username</label>
+                    <input 
+                      type="text"
+                      value={newUserForm.username}
+                      onChange={(e) => setNewUserForm({...newUserForm, username: e.target.value})}
+                      placeholder="johndoe"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Email</label>
+                    <input 
+                      type="email"
+                      value={newUserForm.email}
+                      onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
+                      placeholder="email@example.com"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Password</label>
+                    <input 
+                      type="password"
+                      value={newUserForm.password}
+                      onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
+                      placeholder="••••••••"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <button 
+                      onClick={() => setIsCreatingUser(false)}
+                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleCreateUser}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/20"
+                    >
+                      Create
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-            <table className="w-full text-left">
-              <thead className="bg-slate-800/50 border-b border-slate-800">
-                <tr>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Name</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Email</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Balance</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Role</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {users.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 text-sm font-bold text-white">{u.displayName || 'N/A'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-400">{u.email}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-blue-400">{formatCurrency(u.balance)}</td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                        u.role === 'admin' ? "bg-purple-500/10 text-purple-500 border border-purple-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-500/20"
-                      )}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => {
-                          setEditingUser(u);
-                          setNewBalance(u.balance);
-                          setNewRole(u.role);
-                        }}
-                        className="text-blue-400 hover:text-blue-300 text-xs font-bold"
-                      >
-                        Edit
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-800/50 border-b border-slate-800">
+                  <tr>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Name</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Username</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Email</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Balance</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Role</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {users.map(u => (
+                    <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-white">{u.displayName || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-300 font-mono">@{u.username || 'n/a'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-400">{u.email}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-blue-400">{formatCurrency(u.balance)}</td>
+                      <td className="px-6 py-4">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                          u.role === 'admin' ? "bg-purple-500/10 text-purple-500 border border-purple-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-500/20"
+                        )}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button 
+                          onClick={() => {
+                            setEditingUser(u);
+                            setNewBalance(u.balance);
+                            setNewRole(u.role);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-xs font-bold"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'services' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Package className="w-5 h-5 text-amber-500" /> Services List
+            </h3>
+            <button 
+              onClick={() => {
+                setEditingService({});
+                setServiceForm({ name: '', category: '', rate: 0, min: 10, max: 10000, description: '' });
+              }}
+              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" /> Add Service
+            </button>
+          </div>
+
+          {editingService && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]"
+              >
+                <h3 className="text-xl font-bold text-white mb-6">{editingService.id ? 'Edit Service' : 'Add New Service'}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-sm font-bold text-slate-300">Service Name</label>
+                    <input 
+                      type="text"
+                      value={serviceForm.name}
+                      onChange={(e) => setServiceForm({...serviceForm, name: e.target.value})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="e.g. Instagram Followers [Real]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Category</label>
+                    <input 
+                      type="text"
+                      value={serviceForm.category}
+                      onChange={(e) => setServiceForm({...serviceForm, category: e.target.value})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="e.g. Instagram"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Rate (per 1000)</label>
+                    <input 
+                      type="number"
+                      value={serviceForm.rate}
+                      onChange={(e) => setServiceForm({...serviceForm, rate: Number(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Min Quantity</label>
+                    <input 
+                      type="number"
+                      value={serviceForm.min}
+                      onChange={(e) => setServiceForm({...serviceForm, min: Number(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-300">Max Quantity</label>
+                    <input 
+                      type="number"
+                      value={serviceForm.max}
+                      onChange={(e) => setServiceForm({...serviceForm, max: Number(e.target.value)})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-sm font-bold text-slate-300">Description</label>
+                    <textarea 
+                      value={serviceForm.description}
+                      onChange={(e) => setServiceForm({...serviceForm, description: e.target.value})}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none h-24"
+                      placeholder="Service details..."
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-6">
+                  <button 
+                    onClick={() => setEditingService(null)}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleSaveService}
+                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20"
+                  >
+                    Save Service
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-800/50 border-b border-slate-800">
+                  <tr>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Service</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Category</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Rate</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Min/Max</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {services.map(s => (
+                    <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-white max-w-[200px] truncate">{s.name}</td>
+                      <td className="px-6 py-4 text-sm text-slate-400">{s.category}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-amber-400">{formatCurrency(s.rate)}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500">{s.min} / {s.max}</td>
+                      <td className="px-6 py-4">
+                        <button 
+                          onClick={() => {
+                            setEditingService(s);
+                            setServiceForm({
+                              name: s.name,
+                              category: s.category,
+                              rate: s.rate,
+                              min: s.min,
+                              max: s.max,
+                              description: s.description || ''
+                            });
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-xs font-bold"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {services.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No services found. Add your first service!</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

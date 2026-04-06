@@ -6,6 +6,7 @@ import { auth, db } from '../lib/firebase';
 export interface UserProfile {
   uid: string;
   email: string;
+  username: string;
   displayName: string;
   balance: number;
   role: 'user' | 'admin';
@@ -33,6 +34,7 @@ export function useAuth() {
           const newProfile: UserProfile = {
             uid: firebaseUser.uid,
             email: firebaseUser.email || '',
+            username: firebaseUser.email?.split('@')[0] || 'user',
             displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
             balance: 0,
             role: 'user',

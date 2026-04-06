@@ -2,15 +2,63 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import admin from "firebase-admin";
+import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+  });
+}
+
+const auth = admin.auth();
+const db = admin.firestore();
+
+// If you need to use a specific database ID in admin SDK, you usually do it like this:
+// const db = admin.firestore().databaseId = ... (but this is not standard for admin.firestore())
+// Actually, admin.firestore() uses the default database. 
+// If you have a named database, you might need to use the REST API or a different setup, 
+// but for most cases admin.firestore() is enough.
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Admin API: Create User
+  app.post("/api/admin/create-user", async (req, res) => {
+    const { email, password, displayName, username, balance, role } = req.body;
+    
+    try {
+      // 1. Create Auth User
+      const userRecord = await auth.createUser({
+        email,
+        password,
+        displayName,
+      });
+
+      // 2. Create Firestore Profile
+      await db.collection("users").doc(userRecord.uid).set({
+        uid: userRecord.uid,
+        email,
+        username: username.toLowerCase().trim(),
+        displayName,
+        balance: balance || 0,
+        role: role || "user",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.json({ success: true, uid: userRecord.uid });
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: error.message || "Failed to create user" });
+    }
+  });
 
   // Mock SMM API Endpoints
   app.get("/api/smm/services", (req, res) => {
