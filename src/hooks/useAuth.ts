@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 export interface UserProfile {
   uid: string;
@@ -24,24 +24,28 @@ export function useAuth() {
         setUser(firebaseUser);
         
         // Fetch user profile
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data() as UserProfile);
-        } else {
-          // Profile doesn't exist yet. 
-          // We'll wait for the signup logic to create it, 
-          // or create a default one if it's somehow missing.
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            username: firebaseUser.email?.split('@')[0] || 'user',
-            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-            balance: 0,
-            role: 'user',
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-          setProfile(newProfile);
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            setProfile(userDoc.data() as UserProfile);
+          } else {
+            // Profile doesn't exist yet. 
+            // We'll wait for the signup logic to create it, 
+            // or create a default one if it's somehow missing.
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              username: firebaseUser.email?.split('@')[0] || 'user',
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              balance: 0,
+              role: 'user',
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+            setProfile(newProfile);
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
         setUser(null);

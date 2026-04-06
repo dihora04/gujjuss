@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth, db } from './lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth, UserProfile } from './hooks/useAuth';
 import { cn, formatCurrency, formatDate } from './lib/utils';
@@ -258,6 +258,8 @@ const Dashboard = ({ profile }: { profile: UserProfile }) => {
         totalOrders: orders.length,
         pendingOrders: orders.filter(o => o.status === 'pending' || o.status === 'processing').length
       });
+    }, (error) => {
+      if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'orders_stats');
     });
     return () => unsubscribe();
   }, [profile.uid]);
@@ -355,6 +357,8 @@ const NewOrder = ({ profile }: { profile: UserProfile }) => {
       setServices(data);
       const cats = Array.from(new Set(data.map((s: any) => s.category))) as string[];
       setCategories(cats);
+    }, (error) => {
+      if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'services');
     });
     return () => unsubscribe();
   }, []);
@@ -406,7 +410,12 @@ const NewOrder = ({ profile }: { profile: UserProfile }) => {
       setLink('');
       setQuantity(0);
     } catch (error) {
-      toast.error('Failed to place order');
+      if (error instanceof Error && error.name === 'AbortError') return;
+      try {
+        handleFirestoreError(error, OperationType.WRITE, 'orders/users');
+      } catch (e) {
+        toast.error('Failed to place order');
+      }
     } finally {
       setLoading(false);
     }
@@ -507,6 +516,8 @@ const OrderHistory = ({ profile }: { profile: UserProfile }) => {
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'orders');
     });
     return () => unsubscribe();
   }, [profile.uid]);
@@ -597,7 +608,11 @@ const AddBalance = ({ profile }: { profile: UserProfile }) => {
       toast.success('Payment request submitted! Admin will approve soon.');
       setAmount(0);
     } catch (error) {
-      toast.error('Failed to submit request');
+      try {
+        handleFirestoreError(error, OperationType.CREATE, 'payments');
+      } catch (e) {
+        toast.error('Failed to submit request');
+      }
     } finally {
       setLoading(false);
     }
@@ -705,16 +720,22 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
     const qPayments = query(collection(db, 'payments'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
     const unsubPayments = onSnapshot(qPayments, (snapshot) => {
       setPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'payments');
     });
 
     const qUsers = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     const unsubUsers = onSnapshot(qUsers, (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'users');
     });
 
     const qServices = query(collection(db, 'services'), orderBy('category', 'asc'));
     const unsubServices = onSnapshot(qServices, (snapshot) => {
       setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      if (error.name !== 'AbortError') handleFirestoreError(error, OperationType.GET, 'services');
     });
 
     return () => {
@@ -771,7 +792,11 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
       });
       toast.success('Payment approved!');
     } catch (error) {
-      toast.error('Approval failed');
+      try {
+        handleFirestoreError(error, OperationType.WRITE, `payments/${payment.id}`);
+      } catch (e) {
+        toast.error('Approval failed');
+      }
     }
   };
 
@@ -785,7 +810,11 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
       toast.success('User updated successfully!');
       setEditingUser(null);
     } catch (error) {
-      toast.error('Failed to update user');
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${editingUser.id}`);
+      } catch (e) {
+        toast.error('Failed to update user');
+      }
     }
   };
 
@@ -801,7 +830,11 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
       setEditingService(null);
       setServiceForm({ name: '', category: '', rate: 0, min: 10, max: 10000, description: '' });
     } catch (error) {
-      toast.error('Failed to save service');
+      try {
+        handleFirestoreError(error, OperationType.WRITE, 'services');
+      } catch (e) {
+        toast.error('Failed to save service');
+      }
     }
   };
 
