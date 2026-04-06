@@ -161,17 +161,36 @@ const Sidebar = ({ profile }: { profile: UserProfile | null }) => {
 
 const Login = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAdminLogin = async () => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, 'dihora04@gmail.com', 'admin123456');
+      toast.success('Welcome back, Admin!');
+    } catch (error: any) {
+      toast.error('Admin login failed. Please check if admin is bootstrapped.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUserLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error('Please enter your email or username');
+      return;
+    }
+    setLoading(true);
+    try {
+      // We'll try to login with a default password if none is provided, 
+      // or assume the user knows their password if we kept the field.
+      // But the user asked to REMOVE it. So we use a default one.
+      // Note: In a real app, this is insecure. This is for demo/portal purposes.
+      await signInWithEmailAndPassword(auth, email, 'user123456');
       toast.success('Welcome back!');
     } catch (error: any) {
-      toast.error(error.message || 'Authentication failed');
+      toast.error('Login failed. Ensure your account exists and uses the default password.');
     } finally {
       setLoading(false);
     }
@@ -190,56 +209,61 @@ const Login = () => {
             <TrendingUp className="text-white w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Gujju SMM</h1>
-          <p className="text-slate-400">Admin & User Portal Login</p>
+          <p className="text-slate-400">Select your login method</p>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-300">Email / Username</label>
-            <div className="relative">
-              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input 
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
+        <div className="space-y-6">
+          <button
+            onClick={handleAdminLogin}
+            disabled={loading}
+            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-3"
+          >
+            <ShieldCheck className="w-6 h-6" />
+            Login as Admin
+          </button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-800"></div>
             </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-300">Password</label>
-            <div className="relative">
-              <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input 
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-slate-900 px-2 text-slate-500 font-bold">Or Login as User</span>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 mt-4"
-          >
-            {loading ? 'Logging in...' : (
-              <>
-                Login to Dashboard
-                <TrendingUp className="w-5 h-5" />
-              </>
-            )}
-          </button>
-        </form>
+          <form onSubmit={handleUserLogin} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-300">User Email</label>
+              <div className="relative">
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input 
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+            >
+              {loading ? 'Logging in...' : (
+                <>
+                  Login as User
+                  <TrendingUp className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
 
         <div className="mt-8 pt-8 border-t border-slate-800 text-center">
           <p className="text-slate-500 text-sm">
-            Contact administrator to create an account.
+            Admin can create users from the portal.
           </p>
         </div>
       </motion.div>
@@ -746,26 +770,25 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
   }, []);
 
   const handleCreateUser = async () => {
-    if (!newUserForm.email || !newUserForm.password || !newUserForm.username) {
+    if (!newUserForm.email || !newUserForm.username) {
       toast.error('Please fill required fields');
       return;
     }
     try {
-      // Note: Admin creating user via Firebase Auth requires Admin SDK or a backend endpoint.
-      // Since we are in a sandbox, we'll simulate account creation by adding to Firestore.
-      // In a real app, you'd use a Cloud Function or Admin SDK.
-      // For this demo, we'll use a mock approach or assume the admin can use the signup logic if enabled.
-      // BUT the user asked for ONLY portal saving.
+      // Use a default password for all users created by admin
+      const userPayload = {
+        ...newUserForm,
+        password: 'user123456'
+      };
       
-      // We'll use a dedicated API route for this to handle Auth creation on the server side.
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUserForm)
+        body: JSON.stringify(userPayload)
       });
       
       if (res.ok) {
-        toast.success('User created successfully!');
+        toast.success('User created successfully! Default password: user123456');
         setIsCreatingUser(false);
         setNewUserForm({ email: '', password: '', displayName: '', username: '', balance: 0, role: 'user' });
       } else {
@@ -1017,16 +1040,6 @@ const AdminPanel = ({ profile }: { profile: UserProfile }) => {
                       value={newUserForm.email}
                       onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
                       placeholder="email@example.com"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-300">Password</label>
-                    <input 
-                      type="password"
-                      value={newUserForm.password}
-                      onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
-                      placeholder="••••••••"
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>

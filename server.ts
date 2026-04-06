@@ -18,13 +18,45 @@ if (!admin.apps.length) {
 const auth = admin.auth();
 const db = admin.firestore();
 
-// If you need to use a specific database ID in admin SDK, you usually do it like this:
-// const db = admin.firestore().databaseId = ... (but this is not standard for admin.firestore())
-// Actually, admin.firestore() uses the default database. 
-// If you have a named database, you might need to use the REST API or a different setup, 
-// but for most cases admin.firestore() is enough.
+// Bootstrap Admin User
+async function bootstrapAdmin() {
+  const adminEmail = "dihora04@gmail.com";
+  const adminPassword = "admin123456"; // Default password for the first login
+  
+  try {
+    try {
+      await auth.getUserByEmail(adminEmail);
+      console.log(`Admin user ${adminEmail} already exists.`);
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        console.log(`Creating admin user ${adminEmail}...`);
+        const userRecord = await auth.createUser({
+          email: adminEmail,
+          password: adminPassword,
+          displayName: "Admin",
+        });
+
+        await db.collection("users").doc(userRecord.uid).set({
+          uid: userRecord.uid,
+          email: adminEmail,
+          username: "admin",
+          displayName: "Admin",
+          balance: 1000000,
+          role: "admin",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`Admin user created successfully with password: ${adminPassword}`);
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error("Error bootstrapping admin:", error);
+  }
+}
 
 async function startServer() {
+  await bootstrapAdmin();
   const app = express();
   const PORT = 3000;
 

@@ -16,7 +16,12 @@ export default defineConfig(({mode}) => {
       },
     },
     optimizeDeps: {
-      exclude: ['node-fetch', 'firebase-admin'],
+      exclude: ['firebase-admin', 'node-fetch', 'express'],
+    },
+    build: {
+      rollupOptions: {
+        external: ['firebase-admin', 'node-fetch', 'express'],
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
