@@ -87,7 +87,7 @@ service cloud.firestore {
              isValidEmail(data.email) &&
              data.balance is number && data.balance >= 0 &&
              data.role in ['user', 'admin'] &&
-             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'balance', 'role', 'createdAt']);
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'balance', 'role', 'freeDemoClaimed', 'createdAt']);
     }
 
     function isValidService(data) {
@@ -128,7 +128,10 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
-        (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.balance == resource.data.balance) ||
+        (isOwner(userId) && request.resource.data.role == resource.data.role && (
+          request.resource.data.balance == resource.data.balance || 
+          (request.resource.data.freeDemoClaimed == true && resource.data.freeDemoClaimed != true)
+        )) ||
         isAdmin()
       );
     }

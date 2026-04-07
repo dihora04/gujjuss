@@ -286,6 +286,97 @@ const Landing = () => {
   );
 };
 
+const FreeDemoSection = () => {
+  const { profile } = useAuth();
+  const [instaId, setInstaId] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleClaimDemo = async () => {
+    if (!profile || !instaId) {
+      toast.error('Please enter your Instagram ID');
+      return;
+    }
+
+    if (profile.freeDemoClaimed) {
+      toast.error('You have already claimed your free demo');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Create Free Order
+      await addDoc(collection(db, 'orders'), {
+        userId: profile.uid,
+        serviceId: 'free-demo-100',
+        serviceName: 'Free Demo - 100 Instagram Followers',
+        link: `https://instagram.com/${instaId.replace('@', '')}`,
+        quantity: 100,
+        charge: 0,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+
+      // 2. Update User Profile
+      await setDoc(doc(db, 'users', profile.uid), {
+        ...profile,
+        freeDemoClaimed: true
+      });
+
+      toast.success('Free demo order placed! 100 followers coming soon.');
+      setInstaId('');
+    } catch (error) {
+      toast.error('Failed to claim free demo');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (profile?.freeDemoClaimed) return null;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 mb-12 overflow-hidden relative"
+    >
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center">
+            <Zap size={24} className="text-yellow-300" fill="currentColor" />
+          </div>
+          <h2 className="text-2xl font-bold">Free Demo: 100 Followers</h2>
+        </div>
+        <p className="text-indigo-100 mb-6 max-w-md">
+          Try our premium service for free! Enter your Instagram username below to get 100 high-quality followers instantly.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 font-bold">@</span>
+            <input 
+              type="text" 
+              placeholder="instagram_username"
+              value={instaId}
+              onChange={(e) => setInstaId(e.target.value)}
+              className="w-full pl-10 pr-4 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl outline-none focus:bg-white/20 transition-all placeholder:text-indigo-200"
+            />
+          </div>
+          <button 
+            onClick={handleClaimDemo}
+            disabled={loading}
+            className="px-8 py-4 bg-white text-indigo-600 rounded-2xl font-bold hover:bg-indigo-50 transition-all shadow-lg disabled:opacity-50"
+          >
+            {loading ? 'Processing...' : 'Get Free Followers'}
+          </button>
+        </div>
+      </div>
+      {/* Decorative circles */}
+      <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+      <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-400/20 rounded-full blur-3xl" />
+    </motion.div>
+  );
+};
+
 const Dashboard = () => {
   const { profile } = useAuth();
   const [stats, setStats] = useState({ totalOrders: 0, activeOrders: 0, totalSpent: 0 });
@@ -325,6 +416,8 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
+      
+      <FreeDemoSection />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -687,7 +780,14 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (firebaseUser) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (userDoc.exists()) {
-          setProfile(userDoc.data() as UserProfile);
+          const data = userDoc.data() as UserProfile;
+          if (data.freeDemoClaimed === undefined) {
+            const updatedProfile = { ...data, freeDemoClaimed: false };
+            await setDoc(doc(db, 'users', firebaseUser.uid), updatedProfile);
+            setProfile(updatedProfile);
+          } else {
+            setProfile(data);
+          }
         } else {
           const newProfile: UserProfile = {
             uid: firebaseUser.uid,
@@ -696,6 +796,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             photoURL: firebaseUser.photoURL || '',
             balance: 0,
             role: firebaseUser.email === 'dihora04@gmail.com' ? 'admin' : 'user',
+            freeDemoClaimed: false,
             createdAt: new Date().toISOString()
           };
           await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);

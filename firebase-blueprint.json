@@ -11,6 +11,7 @@
         "photoURL": { "type": "string" },
         "balance": { "type": "number", "description": "Current account balance" },
         "role": { "type": "string", "enum": ["user", "admin"] },
+        "freeDemoClaimed": { "type": "boolean", "description": "Whether the user has claimed the free demo" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "balance", "role"]

@@ -5,6 +5,7 @@ export interface UserProfile {
   photoURL?: string;
   balance: number;
   role: 'user' | 'admin';
+  freeDemoClaimed?: boolean;
   createdAt?: string;
 }
 
