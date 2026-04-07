@@ -206,8 +206,15 @@ const Navbar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: 
   );
 };
 
-const Landing = () => {
+const Landing = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
   const { signIn, user } = useAuth();
+
+  const handleGetStarted = async () => {
+    if (!user) {
+      await signIn();
+    }
+    setActiveTab('new-order');
+  };
 
   return (
     <div className="pt-24 pb-16">
@@ -245,15 +252,16 @@ const Landing = () => {
           transition={{ delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          {!user && (
-            <button 
-              onClick={signIn}
-              className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
-            >
-              Get Started Now <ChevronRight size={20} />
-            </button>
-          )}
-          <button className="px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition-all">
+          <button 
+            onClick={handleGetStarted}
+            className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
+          >
+            {user ? 'Place Order Now' : 'Get Started Now'} <ChevronRight size={20} />
+          </button>
+          <button 
+            onClick={() => setActiveTab(user ? 'new-order' : 'landing')}
+            className="px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition-all"
+          >
             View Services
           </button>
         </motion.div>
@@ -484,7 +492,7 @@ const Dashboard = () => {
   );
 };
 
-const NewOrder = () => {
+const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
   const { profile } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -551,6 +559,7 @@ const NewOrder = () => {
       toast.success('Order placed successfully!');
       setLink('');
       setQuantity(0);
+      setActiveTab('orders');
     } catch (error) {
       toast.error('Failed to place order');
       console.error(error);
@@ -558,6 +567,28 @@ const NewOrder = () => {
       setLoading(false);
     }
   };
+
+  if (services.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 pt-24 pb-16 text-center">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-12">
+          <div className="w-20 h-20 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Zap size={40} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">No Services Available</h2>
+          <p className="text-gray-500 mb-8">We are currently updating our service list. Please check back soon!</p>
+          {profile?.role === 'admin' && (
+            <button 
+              onClick={() => setActiveTab('admin')}
+              className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+            >
+              Go to Admin Panel to Add Services
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-24 pb-16">
@@ -871,7 +902,7 @@ export default function App() {
             <AnimatePresence mode="wait">
               {activeTab === 'landing' && (
                 <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <Landing />
+                  <Landing setActiveTab={setActiveTab} />
                 </motion.div>
               )}
               {activeTab === 'dashboard' && (
@@ -881,7 +912,7 @@ export default function App() {
               )}
               {activeTab === 'new-order' && (
                 <motion.div key="new-order" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <NewOrder />
+                  <NewOrder setActiveTab={setActiveTab} />
                 </motion.div>
               )}
               {activeTab === 'orders' && (
