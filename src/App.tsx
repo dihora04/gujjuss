@@ -601,15 +601,38 @@ const NewOrder = () => {
           </div>
 
           {selectedService && (
-            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-              <p className="text-sm text-indigo-700">
-                <strong>Description:</strong> {selectedService.description || 'No description available.'}
-              </p>
-              <div className="flex gap-4 mt-2 text-xs text-indigo-600 font-medium">
-                <span>Min: {selectedService.min}</span>
-                <span>Max: {selectedService.max}</span>
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-1 p-1.5 bg-indigo-100 text-indigo-600 rounded-lg">
+                  <AlertCircle size={16} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-indigo-900 mb-1">Service Details</h4>
+                  <p className="text-sm text-indigo-700 leading-relaxed">
+                    {selectedService.description || 'No additional description provided for this service.'}
+                  </p>
+                </div>
               </div>
-            </div>
+              
+              <div className="grid grid-cols-3 gap-4 pt-2 border-t border-indigo-100/50">
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold mb-0.5">Price / 1k</p>
+                  <p className="text-sm font-bold text-indigo-900">${selectedService.price.toFixed(2)}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold mb-0.5">Min Order</p>
+                  <p className="text-sm font-bold text-indigo-900">{selectedService.min.toLocaleString()}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold mb-0.5">Max Order</p>
+                  <p className="text-sm font-bold text-indigo-900">{selectedService.max.toLocaleString()}</p>
+                </div>
+              </div>
+            </motion.div>
           )}
 
           <div>
