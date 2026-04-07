@@ -23,7 +23,15 @@ import {
   X,
   ChevronRight,
   CreditCard,
-  DollarSign
+  DollarSign,
+  Wallet,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Package,
+  Layers,
+  Database,
+  FileText,
+  Inbox
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -89,120 +97,85 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 // --- Components ---
 
-const Navbar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) => {
+const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) => {
   const { profile, logout, user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
+  if (!user || !profile) return null;
+
+  const navItems = [
+    { id: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { id: 'new-order', icon: <Plus size={18} />, label: 'New Order' },
+    { id: 'orders', icon: <History size={18} />, label: 'Order History' },
+    { id: 'wallet', icon: <Wallet size={18} />, label: 'Wallet' },
+  ];
+
+  if (profile.role === 'admin') {
+    navItems.push({ id: 'admin', icon: <Settings size={18} />, label: 'Admin Panel' });
+  }
+
+  const initials = profile.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+    <>
+      {/* Mobile Toggle */}
+      <div className="md:hidden fixed top-4 left-4 z-[110]">
+        <button onClick={() => setIsOpen(!isOpen)} className="p-2 bg-white rounded-lg shadow-md border border-gray-100">
+          {isOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      <div className={`sidebar ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300`}>
+        <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('landing')}>
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-              <Zap size={24} fill="currentColor" />
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+              <Zap size={18} fill="currentColor" />
             </div>
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
-              Gujju SMM
-            </span>
+            <span className="text-lg font-bold text-gray-900 font-display">Gujju SMM</span>
           </div>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6">
-            {user ? (
-              <>
-                <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <LayoutDashboard size={18} />
-                  <span>Dashboard</span>
-                </button>
-                <button onClick={() => setActiveTab('new-order')} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${activeTab === 'new-order' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <Plus size={18} />
-                  <span>New Order</span>
-                </button>
-                <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <History size={18} />
-                  <span>Orders</span>
-                </button>
-                {profile?.role === 'admin' && (
-                  <button onClick={() => setActiveTab('admin')} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${activeTab === 'admin' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
-                    <ShieldCheck size={18} />
-                    <span>Admin</span>
-                  </button>
-                )}
-                <div className="h-6 w-px bg-gray-200 mx-2" />
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">${profile?.balance.toFixed(2)}</p>
-                    <p className="text-xs text-gray-500">Balance</p>
-                  </div>
-                  <button onClick={logout} className="p-2 text-gray-400 hover:text-red-600 transition-colors">
-                    <LogOut size={20} />
-                  </button>
-                </div>
-              </>
-            ) : (
-              <button 
-                onClick={() => setActiveTab('landing')}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
-              >
-                Get Started
-              </button>
-            )}
-          </div>
-
-          {/* Mobile Menu Toggle */}
-          <div className="md:hidden flex items-center gap-4">
-            {user && (
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">${profile?.balance.toFixed(2)}</p>
-              </div>
-            )}
-            <button onClick={() => setIsOpen(!isOpen)} className="text-gray-600">
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </div>
+        
+        <nav className="p-2 flex-1 space-y-1">
+          {navItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => { setActiveTab(item.id); setIsOpen(false); }}
+              className={`nav-item w-full ${activeTab === item.id ? 'active' : ''}`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
             </button>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-gray-100">
+          <div className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl mb-2">
+            <div className="avatar w-9 h-9 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-900 truncate">{profile.displayName}</p>
+              <p className="text-xs font-medium text-green-600">${profile.balance.toFixed(2)}</p>
+            </div>
+            {profile.role === 'admin' && (
+              <span className="badge badge-purple text-[9px] px-1.5 py-0.5">Admin</span>
+            )}
           </div>
+          <button onClick={logout} className="btn btn-ghost btn-sm w-full justify-center gap-2">
+            <LogOut size={14} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
 
-      {/* Mobile Nav */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t border-gray-100 overflow-hidden"
-          >
-            <div className="px-4 py-6 space-y-4">
-              {user ? (
-                <>
-                  <button onClick={() => { setActiveTab('dashboard'); setIsOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-600">
-                    <LayoutDashboard size={20} /> Dashboard
-                  </button>
-                  <button onClick={() => { setActiveTab('new-order'); setIsOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-600">
-                    <Plus size={20} /> New Order
-                  </button>
-                  <button onClick={() => { setActiveTab('orders'); setIsOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-600">
-                    <History size={20} /> Orders
-                  </button>
-                  {profile?.role === 'admin' && (
-                    <button onClick={() => { setActiveTab('admin'); setIsOpen(false); }} className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-600">
-                      <ShieldCheck size={20} /> Admin
-                    </button>
-                  )}
-                  <button onClick={logout} className="flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl hover:bg-red-50 text-red-600">
-                    <LogOut size={20} /> Logout
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => { setActiveTab('landing'); setIsOpen(false); }} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium">
-                  Login / Sign Up
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+      {/* Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[100] md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </>
   );
 };
 
@@ -217,35 +190,48 @@ const Landing = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
   };
 
   return (
-    <div className="pt-24 pb-16">
-      {/* Hero */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <div className="hero">
+      <nav className="flex justify-between items-center px-6 md:px-10 py-4 border-b border-white/10">
+        <div className="flex items-center gap-2 text-white font-display font-bold text-xl">
+          <Zap size={22} className="text-indigo-400" fill="currentColor" />
+          <span>Gujju SMM</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="text-slate-400 hover:text-white transition-colors text-sm font-medium" onClick={() => setActiveTab('landing')}>Sign In</button>
+          <button className="btn btn-primary" onClick={handleGetStarted}>Get Started</button>
+        </div>
+      </nav>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-sm font-medium mb-8"
+          className="hero-badge flex items-center gap-2"
         >
-          <Zap size={16} />
+          <TrendingUp size={12} className="text-indigo-300" />
           <span>#1 Rated SMM Panel in Gujarat</span>
         </motion.div>
+        
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight mb-6"
+          className="hero-title"
         >
-          Boost Your Social <br />
-          <span className="text-indigo-600">Presence Instantly</span>
+          Supercharge Your <br />
+          <span className="text-indigo-400">Social Presence</span>
         </motion.h1>
+        
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-xl text-gray-600 max-w-2xl mx-auto mb-10"
+          className="hero-sub"
         >
           Premium quality services for Instagram, YouTube, TikTok, and more. 
           Fast delivery, secure payments, and 24/7 support.
         </motion.p>
+        
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -254,41 +240,53 @@ const Landing = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
         >
           <button 
             onClick={handleGetStarted}
-            className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
+            className="btn btn-primary btn-lg gap-2"
           >
-            {user ? 'Place Order Now' : 'Get Started Now'} <ChevronRight size={20} />
+            <Zap size={16} fill="currentColor" />
+            {user ? 'Place Order Now' : 'Start Growing Now'}
           </button>
           <button 
             onClick={() => setActiveTab(user ? 'new-order' : 'landing')}
-            className="px-8 py-4 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition-all"
+            className="btn btn-lg bg-white/10 text-white border border-white/20 hover:bg-white/20"
           >
             View Services
           </button>
         </motion.div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20">
-          {[
-            { label: 'Happy Clients', value: '10K+', icon: Users },
-            { label: 'Orders Completed', value: '500K+', icon: CheckCircle2 },
-            { label: 'Services', value: '200+', icon: Zap },
-            { label: 'Support', value: '24/7', icon: Clock },
-          ].map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 + i * 0.1 }}
-              className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm"
-            >
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <stat.icon size={24} />
-              </div>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-sm text-gray-500">{stat.label}</p>
-            </motion.div>
-          ))}
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <div className="hero-stat-num">10K+</div>
+            <div className="hero-stat-label">Happy Clients</div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-num">500K+</div>
+            <div className="hero-stat-label">Orders Completed</div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-num">24/7</div>
+            <div className="hero-stat-label">Live Support</div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-num">$0.15</div>
+            <div className="hero-stat-label">Starting Price</div>
+          </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 bg-white/5 border-t border-white/10">
+        {[
+          { icon: <ShieldCheck size={18} />, title: 'Secure & Safe', desc: 'All orders are SSL-protected. No password required for any service.' },
+          { icon: <Zap size={18} />, title: 'Instant Delivery', desc: 'Most orders start within 60 seconds of placement.' },
+          { icon: <Clock size={18} />, title: 'Refill Guarantee', desc: '30-day refill guarantee on all follower services.' },
+        ].map((f, i) => (
+          <div key={i} className="p-8 border-b md:border-b-0 md:border-r border-white/10 last:border-0">
+            <div className="w-10 h-10 bg-indigo-500/20 border border-indigo-500/30 rounded-xl flex items-center justify-center text-indigo-400 mb-4">
+              {f.icon}
+            </div>
+            <h3 className="text-white font-bold mb-2">{f.title}</h3>
+            <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -402,106 +400,111 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
   }, [profile]);
 
+  if (!profile) return null;
+
+  const statCards = [
+    { label: 'Current Balance', value: `$${profile.balance.toFixed(2)}`, icon: <DollarSign size={20} />, color: '#4f46e5', bg: '#eef2ff', change: 'Available' },
+    { label: 'Total Spent', value: `$${stats.totalSpent.toFixed(4)}`, icon: <ShoppingCart size={20} />, color: '#10b981', bg: '#ecfdf5', change: `${stats.totalOrders} orders` },
+    { label: 'Active Orders', value: stats.activeOrders, icon: <Clock size={20} />, color: '#f59e0b', bg: '#fffbeb', change: 'Processing' },
+    { label: 'Total Orders', value: stats.totalOrders, icon: <Package size={20} />, color: '#8b5cf6', bg: '#f5f3ff', change: 'All time' },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+    <div className="p-6 md:p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Welcome back, {profile?.displayName?.split(' ')[0]}!</h1>
-          <p className="text-gray-500">Here's what's happening with your account.</p>
+          <h1 className="text-2xl font-bold text-gray-900 font-display">Dashboard</h1>
+          <p className="text-sm text-gray-500">Welcome back, {profile.displayName.split(' ')[0]} — here's your overview</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-            <div className="w-10 h-10 bg-green-50 text-green-600 rounded-lg flex items-center justify-center">
-              <DollarSign size={20} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Balance</p>
-              <p className="text-lg font-bold text-gray-900">${profile?.balance.toFixed(2)}</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setActiveTab('new-order')}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 flex items-center gap-2"
-          >
-            <Plus size={18} />
-            <span>New Order</span>
-          </button>
-        </div>
+        <button 
+          onClick={() => setActiveTab('new-order')}
+          className="btn btn-primary px-6 py-3 shadow-lg shadow-indigo-100 gap-2"
+        >
+          <Plus size={18} />
+          <span>New Order</span>
+        </button>
       </div>
-      
+
       <FreeDemoSection />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-              <ShoppingCart size={24} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {statCards.map((s, i) => (
+          <div key={i} className="stat-card">
+            <div className="flex justify-between items-start mb-3">
+              <div className="stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{s.change}</span>
             </div>
-            <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">Total</span>
+            <div className="text-2xl font-bold text-gray-900 font-display">{s.value}</div>
+            <div className="text-xs text-gray-500 mt-1">{s.label}</div>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
-          <p className="text-sm text-gray-500">Total Orders Placed</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
-              <Clock size={24} />
-            </div>
-            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Active</span>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.activeOrders}</p>
-          <p className="text-sm text-gray-500">Orders in Progress</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-              <TrendingUp size={24} />
-            </div>
-            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Spent</span>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">${stats.totalSpent.toFixed(2)}</p>
-          <p className="text-sm text-gray-500">Total Amount Spent</p>
-        </div>
+        ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
-          <button onClick={() => setActiveTab('orders')} className="text-indigo-600 text-sm font-medium hover:underline">View All</button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-4 font-medium">ID</th>
-                <th className="px-6 py-4 font-medium">Service</th>
-                <th className="px-6 py-4 font-medium">Quantity</th>
-                <th className="px-6 py-4 font-medium">Charge</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {stats.totalOrders === 0 ? (
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <div className="max-w-xs mx-auto">
-                      <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
-                      <p className="text-gray-500 mb-6">No recent orders found. Start boosting your presence today!</p>
-                      <button 
-                        onClick={() => setActiveTab('new-order')}
-                        className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-colors"
-                      >
-                        Place Your First Order
-                      </button>
-                    </div>
-                  </td>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 card overflow-hidden">
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-bold text-gray-900">Recent Orders</h3>
+            <button onClick={() => setActiveTab('orders')} className="btn btn-secondary btn-sm">View All</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr>
+                  <th className="px-5 py-3">Service</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Amount</th>
                 </tr>
-              ) : (
-                <OrderHistoryList limit={5} />
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {stats.totalOrders === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-12 text-center">
+                      <div className="max-w-xs mx-auto">
+                        <Inbox size={40} className="mx-auto mb-3 text-gray-200" />
+                        <p className="text-sm text-gray-400 mb-4">No orders yet. Start growing today!</p>
+                        <button onClick={() => setActiveTab('new-order')} className="btn btn-primary btn-sm">Place First Order</button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <OrderHistoryList limit={5} compact />
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="wallet-card">
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-[10px] font-bold uppercase tracking-widest opacity-70">Wallet</div>
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">Connected</span>
+            </div>
+            <div className="text-3xl font-bold font-display mb-1">${profile.balance.toFixed(2)}</div>
+            <div className="text-[10px] font-mono opacity-60 truncate">{profile.uid}</div>
+            <div className="mt-6 flex gap-2">
+              <button onClick={() => setActiveTab('wallet')} className="btn btn-sm bg-white/20 text-white flex-1 justify-center border-0">
+                <Plus size={12} /> Deposit
+              </button>
+              <button onClick={() => setActiveTab('orders')} className="btn btn-sm bg-white/10 text-white/70 flex-1 justify-center border-0">
+                <History size={12} /> History
+              </button>
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setActiveTab('new-order')} className="p-3 bg-indigo-50 rounded-xl text-indigo-600 hover:bg-indigo-100 transition-colors text-center">
+                <Zap size={20} className="mx-auto mb-2" />
+                <span className="text-xs font-bold">New Order</span>
+              </button>
+              <button onClick={() => setActiveTab('wallet')} className="p-3 bg-emerald-50 rounded-xl text-emerald-600 hover:bg-emerald-100 transition-colors text-center">
+                <DollarSign size={20} className="mx-auto mb-2" />
+                <span className="text-xs font-bold">Add Funds</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -606,133 +609,171 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
     );
   }
 
+  const charge = selectedService && quantity > 0 ? ((quantity / 1000) * selectedService.price).toFixed(4) : null;
+  const insufficient = charge && profile && profile.balance < parseFloat(charge);
+
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-24 pb-16">
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Place New Order</h1>
-        <p className="text-gray-500 mb-8">Select a service and enter your details to get started.</p>
+    <div className="p-6 md:p-8">
+      <div className="page-header">
+        <h1 className="page-title">New Order</h1>
+        <p className="page-subtitle">Select a service and configure your order</p>
+      </div>
 
-        <form onSubmit={handlePlaceOrder} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select 
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setSelectedService(null);
-              }}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-            >
-              <option value="">Select Category</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Service</label>
-            <select 
-              value={selectedService?.id || ''}
-              onChange={(e) => {
-                const svc = services.find(s => s.id === e.target.value);
-                setSelectedService(svc || null);
-              }}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-            >
-              <option value="">Select Service</option>
-              {filteredServices.map(svc => (
-                <option key={svc.id} value={svc.id}>{svc.name} - ${svc.price} per 1000</option>
-              ))}
-            </select>
-          </div>
-
-          {selectedService && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3"
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-1 p-1.5 bg-indigo-100 text-indigo-600 rounded-lg">
-                  <AlertCircle size={16} />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-indigo-900 mb-1">Service Details</h4>
-                  <p className="text-sm text-indigo-700 leading-relaxed">
-                    {selectedService.description || 'No additional description provided for this service.'}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 pt-2 border-t border-indigo-100/50">
-                <div className="text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold mb-0.5">Price / 1k</p>
-                  <p className="text-sm font-bold text-indigo-900">${selectedService.price.toFixed(2)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold mb-0.5">Min Order</p>
-                  <p className="text-sm font-bold text-indigo-900">{selectedService.min.toLocaleString()}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-bold mb-0.5">Max Order</p>
-                  <p className="text-sm font-bold text-indigo-900">{selectedService.max.toLocaleString()}</p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Link</label>
-            <input 
-              type="url"
-              placeholder="https://instagram.com/p/..."
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-            <input 
-              type="number"
-              placeholder="0"
-              value={quantity || ''}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-              required
-            />
-          </div>
-
-          {selectedService && quantity > 0 && (
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-gray-600">Total Charge:</span>
-              <span className="text-xl font-bold text-gray-900">${((selectedService.price / 1000) * quantity).toFixed(2)}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="card p-6 md:p-8">
+          <form onSubmit={handlePlaceOrder} className="space-y-5">
+            <div>
+              <label className="label">Select Category</label>
+              <select 
+                className="input select"
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setSelectedService(null);
+                }}
+                required
+              >
+                <option value="">— Choose platform —</option>
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
             </div>
-          )}
 
-          <button 
-            type="submit"
-            disabled={loading || !selectedService}
-            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Processing...' : 'Place Order'}
-          </button>
-        </form>
+            {selectedCategory && (
+              <div>
+                <label className="label">Select Service</label>
+                <select 
+                  className="input select"
+                  value={selectedService?.id || ''}
+                  onChange={(e) => setSelectedService(services.find(s => s.id === e.target.value) || null)}
+                  required
+                >
+                  <option value="">— Choose service —</option>
+                  {services.filter(s => s.category === selectedCategory).map(s => (
+                    <option key={s.id} value={s.id}>{s.name} — ${s.price}/1K</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {selectedService && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="info-box">
+                <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm mb-2">
+                  <AlertCircle size={14} />
+                  <span>{selectedService.name}</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed mb-4">{selectedService.description}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white/60 p-2 rounded-lg border border-indigo-100">
+                    <p className="text-[9px] text-slate-400 uppercase font-bold">Min Order</p>
+                    <p className="text-xs font-bold text-slate-800">{selectedService.min.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-white/60 p-2 rounded-lg border border-indigo-100">
+                    <p className="text-[9px] text-slate-400 uppercase font-bold">Max Order</p>
+                    <p className="text-xs font-bold text-slate-800">{selectedService.max.toLocaleString()}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            <div>
+              <label className="label">Link / URL</label>
+              <input 
+                type="url"
+                placeholder="https://instagram.com/p/..."
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="input"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label">Quantity {selectedService && <span className="text-slate-400">({selectedService.min.toLocaleString()} – {selectedService.max.toLocaleString()})</span>}</label>
+              <input 
+                type="number"
+                placeholder="0"
+                value={quantity || ''}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="input"
+                required
+              />
+            </div>
+
+            {charge && (
+              <div className={`charge-box ${insufficient ? 'bg-red-500' : ''}`}>
+                <div>
+                  <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">Total Charge</p>
+                  <p className="text-[10px] opacity-60">{quantity.toLocaleString()} × ${selectedService?.price}/1K</p>
+                </div>
+                <div className="text-2xl font-bold font-display">${charge}</div>
+              </div>
+            )}
+
+            {insufficient && (
+              <div className="flex items-center gap-2 text-red-500 text-xs font-bold">
+                <AlertCircle size={14} />
+                <span>Insufficient balance. Need ${(parseFloat(charge!) - (profile?.balance || 0)).toFixed(4)} more.</span>
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={loading || !selectedService || insufficient || quantity === 0}
+              className="btn btn-primary w-full py-4 text-base font-bold shadow-lg shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Processing...' : 'Place Order'}
+            </button>
+          </form>
+        </div>
+
+        <div className="space-y-6">
+          <div className="card p-6">
+            <h3 className="text-sm font-bold text-gray-900 mb-4">Available Services</h3>
+            <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              {categories.map(cat => (
+                <div key={cat}>
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{cat}</h4>
+                  <div className="space-y-2">
+                    {services.filter(s => s.category === cat).map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSelectedCategory(cat); setSelectedService(s); }}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-all border ${selectedService?.id === s.id ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' : 'bg-gray-50 border-transparent hover:border-gray-200'}`}
+                      >
+                        <span className="text-xs font-bold text-gray-700">{s.name}</span>
+                        <span className="text-xs font-bold text-indigo-600">${s.price}/K</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-6 bg-indigo-900 text-white">
+            <h3 className="text-xs font-bold opacity-70 uppercase tracking-widest mb-2">Your Balance</h3>
+            <div className="text-3xl font-bold font-display mb-4">${profile?.balance.toFixed(2)}</div>
+            <button onClick={() => setActiveTab('wallet')} className="btn bg-white/20 text-white hover:bg-white/30 border-0 w-full justify-center gap-2">
+              <Plus size={16} /> Add Funds
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-const OrderHistoryList = ({ limit }: { limit?: number }) => {
+const OrderHistoryList = ({ limit, compact }: { limit?: number; compact?: boolean }) => {
   const { profile } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     if (!profile) return;
-    const q = query(collection(db, 'orders'), where('userId', '==', profile.uid), orderBy('createdAt', 'desc'));
+    const q = query(
+      collection(db, 'orders'), 
+      where('userId', '==', profile.uid), 
+      orderBy('createdAt', 'desc')
+    );
     return onSnapshot(q, (snapshot) => {
       let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       if (limit) docs = docs.slice(0, limit);
@@ -740,41 +781,47 @@ const OrderHistoryList = ({ limit }: { limit?: number }) => {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
   }, [profile, limit]);
 
-  if (orders.length === 0) {
-    return (
-      <tr>
-        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-          <History size={48} className="mx-auto mb-4 opacity-20" />
-          <p>No orders found yet.</p>
-        </td>
-      </tr>
-    );
-  }
+  if (orders.length === 0) return null;
 
   return (
     <>
       {orders.map((order) => (
-        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-          <td className="px-6 py-4 text-xs font-mono text-gray-400">#{order.id.slice(0, 8)}</td>
-          <td className="px-6 py-4 font-medium text-gray-900">{order.serviceName}</td>
-          <td className="px-6 py-4 text-sm text-indigo-600 truncate max-w-[200px]">
-            <a href={order.link} target="_blank" rel="noopener noreferrer">{order.link}</a>
+        <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+          <td className="px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Zap size={14} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-gray-900 truncate max-w-[150px]">{order.serviceName}</p>
+                {!compact && <p className="text-[10px] text-gray-400 truncate max-w-[150px]">{order.link}</p>}
+              </div>
+            </div>
           </td>
-          <td className="px-6 py-4 text-sm text-gray-600">{order.quantity.toLocaleString()}</td>
-          <td className="px-6 py-4 text-sm font-bold text-gray-900">${order.charge.toFixed(2)}</td>
-          <td className="px-6 py-4">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              order.status === 'completed' ? 'bg-green-50 text-green-600' :
-              order.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-              order.status === 'processing' ? 'bg-indigo-50 text-indigo-600' :
-              'bg-red-50 text-red-600'
+          {!compact && (
+            <td className="px-5 py-4">
+              <span className="text-xs font-medium text-gray-600">{order.quantity.toLocaleString()}</span>
+            </td>
+          )}
+          <td className="px-5 py-4">
+            <span className={`badge ${
+              order.status === 'completed' ? 'badge-green' : 
+              order.status === 'pending' ? 'badge-amber' : 
+              order.status === 'processing' ? 'badge-blue' : 'badge-red'
             }`}>
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              {order.status}
             </span>
           </td>
-          <td className="px-6 py-4 text-sm text-gray-500">
-            {new Date(order.createdAt).toLocaleDateString()}
+          <td className="px-5 py-4">
+            <span className="text-xs font-bold text-gray-900">${order.charge.toFixed(4)}</span>
           </td>
+          {!compact && (
+            <td className="px-5 py-4">
+              <span className="text-[10px] font-medium text-gray-400">
+                {new Date(order.createdAt).toLocaleDateString()}
+              </span>
+            </td>
+          )}
         </tr>
       ))}
     </>
@@ -784,32 +831,46 @@ const OrderHistoryList = ({ limit }: { limit?: number }) => {
 const AdminPanel = () => {
   const [category, setCategory] = useState('');
   const [name, setName] = useState('');
-  const [price, setPrice] = useState<number>(0);
-  const [min, setMin] = useState<number>(0);
-  const [max, setMax] = useState<number>(0);
+  const [price, setPrice] = useState(0);
+  const [min, setMin] = useState(0);
+  const [max, setMax] = useState(0);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeedServices = async () => {
+    setSeeding(true);
+    const defaultServices = [
+      { category: 'Instagram', name: 'Instagram Followers [Real]', price: 1.50, min: 100, max: 50000, description: 'High quality real looking followers.' },
+      { category: 'Instagram', name: 'Instagram Likes [Instant]', price: 0.50, min: 50, max: 20000, description: 'Instant delivery likes for your posts.' },
+      { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 3.20, min: 500, max: 100000, description: 'High retention YouTube views.' },
+      { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 2.10, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' },
+      { category: 'TikTok', name: 'TikTok Likes [Instant]', price: 0.80, min: 100, max: 50000, description: 'Instant delivery TikTok likes.' },
+      { category: 'Facebook', name: 'Facebook Page Likes + Followers', price: 4.50, min: 100, max: 50000, description: 'High quality page likes.' },
+      { category: 'Twitter', name: 'Twitter Followers [Real]', price: 5.00, min: 100, max: 10000, description: 'Real looking Twitter followers.' }
+    ];
+
+    try {
+      for (const svc of defaultServices) {
+        await addDoc(collection(db, 'services'), { ...svc, active: true });
+      }
+      toast.success('Services seeded successfully!');
+    } catch (error) {
+      toast.error('Failed to seed services');
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const handleAddService = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await addDoc(collection(db, 'services'), {
-        category,
-        name,
-        price,
-        min,
-        max,
-        description,
-        active: true
+        category, name, price, min, max, description, active: true
       });
       toast.success('Service added successfully');
-      setCategory('');
-      setName('');
-      setPrice(0);
-      setMin(0);
-      setMax(0);
-      setDescription('');
+      setCategory(''); setName(''); setPrice(0); setMin(0); setMax(0); setDescription('');
     } catch (error) {
       toast.error('Failed to add service');
     } finally {
@@ -818,22 +879,87 @@ const AdminPanel = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-24 pb-16">
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Admin: Add Service</h1>
-        <form onSubmit={handleAddService} className="space-y-4">
-          <input type="text" placeholder="Category" value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200" required />
-          <input type="text" placeholder="Service Name" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200" required />
-          <div className="grid grid-cols-3 gap-4">
-            <input type="number" placeholder="Price per 1000" value={price || ''} onChange={e => setPrice(Number(e.target.value))} className="w-full px-4 py-3 rounded-xl border border-gray-200" required />
-            <input type="number" placeholder="Min" value={min || ''} onChange={e => setMin(Number(e.target.value))} className="w-full px-4 py-3 rounded-xl border border-gray-200" required />
-            <input type="number" placeholder="Max" value={max || ''} onChange={e => setMax(Number(e.target.value))} className="w-full px-4 py-3 rounded-xl border border-gray-200" required />
+    <div className="p-6 md:p-8">
+      <div className="page-header">
+        <h1 className="page-title">Admin Panel</h1>
+        <p className="page-subtitle">Manage services and system configuration</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="card p-6 md:p-8">
+          <h3 className="text-lg font-bold text-gray-900 mb-6">Add New Service</h3>
+          <form onSubmit={handleAddService} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Category</label>
+                <input type="text" placeholder="e.g. Instagram" value={category} onChange={e => setCategory(e.target.value)} className="input" required />
+              </div>
+              <div>
+                <label className="label">Service Name</label>
+                <input type="text" placeholder="e.g. Real Followers" value={name} onChange={e => setName(e.target.value)} className="input" required />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="label">Price/1K</label>
+                <input type="number" step="0.01" placeholder="0.00" value={price || ''} onChange={e => setPrice(Number(e.target.value))} className="input" required />
+              </div>
+              <div>
+                <label className="label">Min</label>
+                <input type="number" placeholder="100" value={min || ''} onChange={e => setMin(Number(e.target.value))} className="input" required />
+              </div>
+              <div>
+                <label className="label">Max</label>
+                <input type="number" placeholder="10000" value={max || ''} onChange={e => setMax(Number(e.target.value))} className="input" required />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Description</label>
+              <textarea placeholder="Service details..." value={description} onChange={e => setDescription(e.target.value)} className="input min-h-[100px]" />
+            </div>
+
+            <button type="submit" disabled={loading} className="btn btn-primary w-full py-4 justify-center">
+              {loading ? 'Adding...' : 'Add Service'}
+            </button>
+          </form>
+        </div>
+
+        <div className="space-y-6">
+          <div className="card p-6 md:p-8 bg-emerald-50 border-emerald-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                <Zap size={20} fill="currentColor" />
+              </div>
+              <h3 className="text-lg font-bold text-emerald-900">Quick Setup</h3>
+            </div>
+            <p className="text-sm text-emerald-700 mb-6 leading-relaxed">
+              Populate your panel with a standard set of social media services (Instagram, YouTube, TikTok, etc.) to get started instantly.
+            </p>
+            <button 
+              onClick={handleSeedServices}
+              disabled={seeding}
+              className="btn bg-emerald-600 text-white hover:bg-emerald-700 border-0 w-full justify-center py-4 shadow-lg shadow-emerald-100"
+            >
+              {seeding ? 'Seeding...' : 'Add All Standard Services'}
+            </button>
           </div>
-          <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 h-32" />
-          <button type="submit" disabled={loading} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold">
-            {loading ? 'Adding...' : 'Add Service'}
-          </button>
-        </form>
+
+          <div className="card p-6">
+            <h3 className="text-sm font-bold text-gray-900 mb-4">System Stats</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Users</p>
+                <p className="text-xl font-bold text-gray-900">1,284</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Orders</p>
+                <p className="text-xl font-bold text-gray-900">15,492</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -927,80 +1053,121 @@ const AppContent = ({ activeTab, setActiveTab }: { activeTab: string; setActiveT
     }
   }, [user, loading, activeTab]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 font-medium animate-pulse">Loading Gujju SMM...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeTab === 'landing') {
+    return <Landing setActiveTab={setActiveTab} />;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50 flex">
       <Toaster position="top-right" />
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main>
+      <main className="flex-1 md:ml-64 min-h-screen relative">
         <AnimatePresence mode="wait">
-          {activeTab === 'landing' && (
-            <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Landing setActiveTab={setActiveTab} />
-            </motion.div>
-          )}
-          {activeTab === 'dashboard' && (
-            <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Dashboard setActiveTab={setActiveTab} />
-            </motion.div>
-          )}
-          {activeTab === 'new-order' && (
-            <motion.div key="new-order" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <NewOrder setActiveTab={setActiveTab} />
-            </motion.div>
-          )}
-          {activeTab === 'orders' && (
-            <motion.div key="orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="max-w-7xl mx-auto px-4 pt-24 pb-16">
-                <h1 className="text-3xl font-bold mb-8">Order History</h1>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="min-h-full"
+          >
+            {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
+            {activeTab === 'new-order' && <NewOrder setActiveTab={setActiveTab} />}
+            {activeTab === 'orders' && (
+              <div className="p-6 md:p-8">
+                <div className="page-header">
+                  <h1 className="page-title">Order History</h1>
+                  <p className="page-subtitle">Track and manage your social media growth</p>
+                </div>
+                <div className="card overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                      <thead>
                         <tr>
-                          <th className="px-6 py-4 font-medium">ID</th>
-                          <th className="px-6 py-4 font-medium">Service</th>
-                          <th className="px-6 py-4 font-medium">Link</th>
-                          <th className="px-6 py-4 font-medium">Quantity</th>
-                          <th className="px-6 py-4 font-medium">Charge</th>
-                          <th className="px-6 py-4 font-medium">Status</th>
-                          <th className="px-6 py-4 font-medium">Date</th>
+                          <th className="px-5 py-4">Service</th>
+                          <th className="px-5 py-4">Quantity</th>
+                          <th className="px-5 py-4">Status</th>
+                          <th className="px-5 py-4">Charge</th>
+                          <th className="px-5 py-4">Date</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-50">
                         <OrderHistoryList />
                       </tbody>
                     </table>
                   </div>
                 </div>
               </div>
-            </motion.div>
-          )}
-          {activeTab === 'admin' && (
-            <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <AdminPanel />
-            </motion.div>
-          )}
+            )}
+            {activeTab === 'wallet' && (
+              <div className="p-6 md:p-8">
+                <div className="page-header">
+                  <h1 className="page-title">Wallet</h1>
+                  <p className="page-subtitle">Manage your funds and transaction history</p>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-1">
+                    <div className="wallet-card mb-6">
+                      <p className="text-xs font-bold opacity-70 uppercase tracking-widest mb-1">Available Balance</p>
+                      <p className="text-4xl font-bold font-display mb-6">${profile?.balance.toFixed(2)}</p>
+                      <button className="btn bg-white text-indigo-600 w-full justify-center py-4 font-bold">
+                        Add Funds
+                      </button>
+                    </div>
+                    <div className="card p-6">
+                      <h3 className="font-bold text-gray-900 mb-4">Payment Methods</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 opacity-50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-gray-200">
+                              <CreditCard size={16} />
+                            </div>
+                            <span className="text-xs font-bold">Credit Card</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400">Soon</span>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-indigo-200 text-indigo-600">
+                              <Wallet size={16} />
+                            </div>
+                            <span className="text-xs font-bold">Crypto / Wallet</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-indigo-600">Active</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <div className="card">
+                      <div className="p-5 border-b border-gray-100">
+                        <h3 className="font-bold text-gray-900">Transaction History</h3>
+                      </div>
+                      <div className="p-12 text-center">
+                        <History size={48} className="mx-auto mb-4 text-gray-200" />
+                        <p className="text-gray-400 text-sm">No transactions found yet.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeTab === 'admin' && <AdminPanel />}
+          </motion.div>
         </AnimatePresence>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-100 py-12">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-              <Zap size={18} fill="currentColor" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">Gujju SMM</span>
-          </div>
-          <p className="text-gray-500 text-sm">© 2026 Gujju SMM Panel. All rights reserved.</p>
-          <div className="flex justify-center gap-6 mt-6">
-            <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Terms</a>
-            <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Privacy</a>
-            <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Support</a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
