@@ -1,57 +1,60 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: userId (UID)
+// Fields:
+//   - uid: string (required)
+//   - email: string (required)
+//   - displayName: string (optional)
+//   - photoURL: string (optional)
+//   - balance: number (required, >= 0)
+//   - role: string (required, ['user', 'admin'])
+//   - createdAt: string (format: date-time)
+//
+// Collection: services
+// Document ID: serviceId
+// Fields:
+//   - category: string (required)
+//   - name: string (required)
+//   - price: number (required, > 0)
+//   - min: number (required, > 0)
+//   - max: number (required, > min)
+//   - description: string (optional)
+//   - active: bool (required)
+//
+// Collection: orders
+// Document ID: orderId
+// Fields:
+//   - userId: string (required, immutable)
+//   - serviceId: string (required)
+//   - serviceName: string (required)
+//   - link: string (required)
+//   - quantity: number (required, > 0)
+//   - charge: number (required, >= 0)
+//   - status: string (required, ['pending', 'processing', 'completed', 'cancelled', 'refunded'])
+//   - createdAt: string (required, format: date-time)
+//
+// Collection: transactions
+// Document ID: transactionId
+// Fields:
+//   - userId: string (required, immutable)
+//   - amount: number (required)
+//   - type: string (required, ['deposit', 'order', 'refund'])
+//   - description: string (optional)
+//   - createdAt: string (required, format: date-time)
+//
+// ===============================================================
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Document ID: userId (auth.uid)
-    // Fields:
-    //   - uid: string (required)
-    //   - email: string (required)
-    //   - displayName: string (optional)
-    //   - balance: number (required, >= 0)
-    //   - role: string (required, 'user' or 'admin')
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: services
-    // Document ID: serviceId
-    // Fields:
-    //   - name: string (required)
-    //   - category: string (required)
-    //   - pricePer1000: number (required)
-    //   - minQuantity: number (required)
-    //   - maxQuantity: number (required)
-    //   - description: string (optional)
-    //
-    // Collection: orders
-    // Document ID: orderId
-    // Fields:
-    //   - userId: string (required)
-    //   - serviceId: string (required)
-    //   - serviceName: string (required)
-    //   - link: string (required)
-    //   - quantity: number (required)
-    //   - charge: number (required)
-    //   - status: string (required)
-    //   - createdAt: timestamp (required)
-    //
-    // Collection: payments
-    // Document ID: paymentId
-    // Fields:
-    //   - userId: string (required)
-    //   - amount: number (required)
-    //   - method: string (required)
-    //   - status: string (required)
-    //   - transactionId: string (optional)
-    //   - createdAt: timestamp (required)
-    //
-    // ===============================================================
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
+
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -61,38 +64,60 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
          (request.auth.token.email == "dihora04@gmail.com" && request.auth.token.email_verified == true));
     }
 
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'email', 'balance', 'role', 'createdAt']) &&
-             data.uid is string &&
-             data.email is string &&
+      return data.keys().hasAll(['uid', 'email', 'balance', 'role']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
              data.balance is number && data.balance >= 0 &&
              data.role in ['user', 'admin'] &&
-             data.createdAt is timestamp;
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'balance', 'role', 'createdAt']);
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['category', 'name', 'price', 'min', 'max', 'active']) &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.price is number && data.price > 0 &&
+             data.min is number && data.min > 0 &&
+             data.max is number && data.max >= data.min &&
+             data.active is bool;
     }
 
     function isValidOrder(data) {
       return data.keys().hasAll(['userId', 'serviceId', 'serviceName', 'link', 'quantity', 'charge', 'status', 'createdAt']) &&
              data.userId == request.auth.uid &&
              data.serviceId is string &&
-             data.link is string && data.link.size() > 0 &&
+             data.serviceName is string &&
+             data.link is string && data.link.size() > 0 && data.link.size() < 500 &&
              data.quantity is number && data.quantity > 0 &&
              data.charge is number && data.charge >= 0 &&
-             data.status in ['pending', 'processing', 'completed', 'partial', 'canceled'] &&
-             data.createdAt is timestamp;
+             data.status in ['pending', 'processing', 'completed', 'cancelled', 'refunded'] &&
+             isValidDateString(data.createdAt);
     }
 
-    function isValidPayment(data) {
-      return data.keys().hasAll(['userId', 'amount', 'method', 'status', 'createdAt']) &&
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['userId', 'amount', 'type', 'createdAt']) &&
              data.userId == request.auth.uid &&
-             data.amount is number && data.amount > 0 &&
-             data.method is string &&
-             data.status in ['pending', 'approved', 'rejected'] &&
-             data.createdAt is timestamp;
+             data.amount is number &&
+             data.type in ['deposit', 'order', 'refund'] &&
+             isValidDateString(data.createdAt);
     }
 
     // ===============================================================
@@ -101,25 +126,30 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user' && request.resource.data.balance == 0;
-      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']) && isValidUser(request.resource.data));
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.balance == resource.data.balance) ||
+        isAdmin()
+      );
     }
 
     match /services/{serviceId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read: if true; // Publicly readable for landing page
+      allow write: if isAdmin() && isValidService(request.resource.data);
     }
 
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && isValidOrder(request.resource.data);
-      allow update: if isAdmin();
+      allow update: if isAdmin() && isValidOrder(request.resource.data);
+      allow delete: if isAdmin();
     }
 
-    match /payments/{paymentId} {
+    match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidPayment(request.resource.data) && request.resource.data.status == 'pending';
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
       allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

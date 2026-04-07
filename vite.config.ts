@@ -9,20 +9,22 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'global': 'window',
-      'process': {},
+      'global': 'globalThis',
+      'process.env': {},
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        'node-fetch': path.resolve(__dirname, 'src/lib/noop.ts'),
+        'whatwg-fetch': path.resolve(__dirname, 'src/lib/noop.ts'),
       },
     },
     optimizeDeps: {
-      exclude: ['firebase-admin', 'node-fetch', 'express'],
+      exclude: ['firebase-admin'],
     },
     build: {
       rollupOptions: {
-        external: ['firebase-admin', 'node-fetch', 'express'],
+        external: ['firebase-admin'],
       },
     },
     server: {

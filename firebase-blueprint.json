@@ -2,13 +2,14 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "User profile and balance information.",
+      "description": "User profile and balance information",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string" },
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
-        "balance": { "type": "number" },
+        "photoURL": { "type": "string" },
+        "balance": { "type": "number", "description": "Current account balance" },
         "role": { "type": "string", "enum": ["user", "admin"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -16,71 +17,66 @@
     },
     "Service": {
       "title": "Service",
-      "description": "SMM service details.",
+      "description": "SMM service details",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "name": { "type": "string" },
         "category": { "type": "string" },
-        "pricePer1000": { "type": "number" },
-        "minQuantity": { "type": "number" },
-        "maxQuantity": { "type": "number" },
+        "name": { "type": "string" },
+        "price": { "type": "number", "description": "Price per 1000 units" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
         "description": { "type": "string" },
-        "providerId": { "type": "string" },
-        "providerServiceId": { "type": "string" }
+        "active": { "type": "boolean" }
       },
-      "required": ["name", "category", "pricePer1000", "minQuantity", "maxQuantity"]
+      "required": ["category", "name", "price", "min", "max", "active"]
     },
     "Order": {
       "title": "Order",
-      "description": "SMM order details.",
+      "description": "User service order",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
         "userId": { "type": "string" },
         "serviceId": { "type": "string" },
         "serviceName": { "type": "string" },
         "link": { "type": "string" },
         "quantity": { "type": "number" },
         "charge": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "processing", "completed", "partial", "canceled"] },
-        "externalOrderId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "cancelled", "refunded"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "serviceId", "link", "quantity", "charge", "status"]
+      "required": ["userId", "serviceId", "link", "quantity", "charge", "status", "createdAt"]
     },
-    "Payment": {
-      "title": "Payment",
-      "description": "Payment transaction details.",
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction log",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
         "userId": { "type": "string" },
         "amount": { "type": "number" },
-        "method": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "transactionId": { "type": "string" },
+        "type": { "type": "string", "enum": ["deposit", "order", "refund"] },
+        "description": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "amount", "method", "status"]
+      "required": ["userId", "amount", "type", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
-      "description": "User profile data."
+      "description": "User profiles"
     },
     "/services/{serviceId}": {
       "schema": "Service",
-      "description": "Available SMM services."
+      "description": "Available SMM services"
     },
     "/orders/{orderId}": {
       "schema": "Order",
-      "description": "User orders."
+      "description": "User orders"
     },
-    "/payments/{paymentId}": {
-      "schema": "Payment",
-      "description": "Payment transactions."
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User transactions"
     }
   }
 }
