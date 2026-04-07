@@ -385,7 +385,7 @@ const FreeDemoSection = () => {
   );
 };
 
-const Dashboard = () => {
+const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
   const { profile } = useAuth();
   const [stats, setStats] = useState({ totalOrders: 0, activeOrders: 0, totalSpent: 0 });
 
@@ -419,8 +419,12 @@ const Dashboard = () => {
               <p className="text-lg font-bold text-gray-900">${profile?.balance.toFixed(2)}</p>
             </div>
           </div>
-          <button className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
-            Add Funds
+          <button 
+            onClick={() => setActiveTab('new-order')}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 flex items-center gap-2"
+          >
+            <Plus size={18} />
+            <span>New Order</span>
           </button>
         </div>
       </div>
@@ -463,7 +467,7 @@ const Dashboard = () => {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
-          <button className="text-indigo-600 text-sm font-medium hover:underline">View All</button>
+          <button onClick={() => setActiveTab('orders')} className="text-indigo-600 text-sm font-medium hover:underline">View All</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -478,12 +482,24 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {/* Mock or real data mapping here */}
-              <tr className="hover:bg-gray-50 transition-colors">
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  No recent orders found.
-                </td>
-              </tr>
+              {stats.totalOrders === 0 ? (
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="max-w-xs mx-auto">
+                      <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p className="text-gray-500 mb-6">No recent orders found. Start boosting your presence today!</p>
+                      <button 
+                        onClick={() => setActiveTab('new-order')}
+                        className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-colors"
+                      >
+                        Place Your First Order
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <OrderHistoryList limit={5} />
+              )}
             </tbody>
           </table>
         </div>
@@ -710,7 +726,7 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
   );
 };
 
-const OrderHistoryList = () => {
+const OrderHistoryList = ({ limit }: { limit?: number }) => {
   const { profile } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -718,9 +734,11 @@ const OrderHistoryList = () => {
     if (!profile) return;
     const q = query(collection(db, 'orders'), where('userId', '==', profile.uid), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+      let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      if (limit) docs = docs.slice(0, limit);
+      setOrders(docs);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
-  }, [profile]);
+  }, [profile, limit]);
 
   if (orders.length === 0) {
     return (
@@ -894,81 +912,95 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
-          <Toaster position="top-right" />
-          <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
-          
-          <main>
-            <AnimatePresence mode="wait">
-              {activeTab === 'landing' && (
-                <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <Landing setActiveTab={setActiveTab} />
-                </motion.div>
-              )}
-              {activeTab === 'dashboard' && (
-                <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <Dashboard />
-                </motion.div>
-              )}
-              {activeTab === 'new-order' && (
-                <motion.div key="new-order" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <NewOrder setActiveTab={setActiveTab} />
-                </motion.div>
-              )}
-              {activeTab === 'orders' && (
-                <motion.div key="orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <div className="max-w-7xl mx-auto px-4 pt-24 pb-16">
-                    <h1 className="text-3xl font-bold mb-8">Order History</h1>
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                            <tr>
-                              <th className="px-6 py-4 font-medium">ID</th>
-                              <th className="px-6 py-4 font-medium">Service</th>
-                              <th className="px-6 py-4 font-medium">Link</th>
-                              <th className="px-6 py-4 font-medium">Quantity</th>
-                              <th className="px-6 py-4 font-medium">Charge</th>
-                              <th className="px-6 py-4 font-medium">Status</th>
-                              <th className="px-6 py-4 font-medium">Date</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            <OrderHistoryList />
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-              {activeTab === 'admin' && (
-                <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <AdminPanel />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
-
-          {/* Footer */}
-          <footer className="bg-white border-t border-gray-100 py-12">
-            <div className="max-w-7xl mx-auto px-4 text-center">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-                  <Zap size={18} fill="currentColor" />
-                </div>
-                <span className="text-lg font-bold text-gray-900">Gujju SMM</span>
-              </div>
-              <p className="text-gray-500 text-sm">© 2026 Gujju SMM Panel. All rights reserved.</p>
-              <div className="flex justify-center gap-6 mt-6">
-                <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Terms</a>
-                <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Privacy</a>
-                <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Support</a>
-              </div>
-            </div>
-          </footer>
-        </div>
+        <AppContent activeTab={activeTab} setActiveTab={setActiveTab} />
       </AuthProvider>
     </ErrorBoundary>
   );
 }
+
+const AppContent = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) => {
+  const { user, profile, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user && activeTab === 'landing') {
+      setActiveTab('dashboard');
+    }
+  }, [user, loading, activeTab]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      <Toaster position="top-right" />
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      
+      <main>
+        <AnimatePresence mode="wait">
+          {activeTab === 'landing' && (
+            <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Landing setActiveTab={setActiveTab} />
+            </motion.div>
+          )}
+          {activeTab === 'dashboard' && (
+            <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Dashboard setActiveTab={setActiveTab} />
+            </motion.div>
+          )}
+          {activeTab === 'new-order' && (
+            <motion.div key="new-order" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <NewOrder setActiveTab={setActiveTab} />
+            </motion.div>
+          )}
+          {activeTab === 'orders' && (
+            <motion.div key="orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <div className="max-w-7xl mx-auto px-4 pt-24 pb-16">
+                <h1 className="text-3xl font-bold mb-8">Order History</h1>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                        <tr>
+                          <th className="px-6 py-4 font-medium">ID</th>
+                          <th className="px-6 py-4 font-medium">Service</th>
+                          <th className="px-6 py-4 font-medium">Link</th>
+                          <th className="px-6 py-4 font-medium">Quantity</th>
+                          <th className="px-6 py-4 font-medium">Charge</th>
+                          <th className="px-6 py-4 font-medium">Status</th>
+                          <th className="px-6 py-4 font-medium">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        <OrderHistoryList />
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+          {activeTab === 'admin' && (
+            <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <AdminPanel />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-100 py-12">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+              <Zap size={18} fill="currentColor" />
+            </div>
+            <span className="text-lg font-bold text-gray-900">Gujju SMM</span>
+          </div>
+          <p className="text-gray-500 text-sm">© 2026 Gujju SMM Panel. All rights reserved.</p>
+          <div className="flex justify-center gap-6 mt-6">
+            <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Terms</a>
+            <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Privacy</a>
+            <a href="#" className="text-gray-400 hover:text-indigo-600 transition-colors">Support</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
