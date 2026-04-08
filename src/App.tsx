@@ -700,8 +700,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
-      setUser(u);
       if (u) {
+        setUser(u);
         const docRef = doc(db, 'users', u.uid);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
@@ -709,19 +709,25 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           const newProfile: UserProfile = {
             uid: u.uid,
-            email: u.email || 'guest@gujjusmm.com',
-            displayName: u.displayName || 'Guest User',
-            balance: 100.00, // Starting balance for demo
-            role: 'user',
+            email: u.email || 'admin@gujjusmm.com',
+            displayName: u.displayName || 'Admin User',
+            balance: 1000.00, // Generous starting balance
+            role: 'admin', // Default to admin for direct portal
             createdAt: new Date().toISOString()
           };
           await setDoc(docRef, newProfile);
           setProfile(newProfile);
         }
+        setLoading(false);
       } else {
-        setProfile(null);
+        // Automatically sign in if not authenticated
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.error("Auto-login failed:", e);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
   }, []);
 
@@ -748,7 +754,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppContent = () => {
-  const { user, loading, login } = useAuth();
+  const { loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   if (loading) {
@@ -758,32 +764,6 @@ const AppContent = () => {
           <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin shadow-2xl shadow-brand-primary/20" />
           <p className="text-gray-500 font-bold uppercase tracking-[0.3em] animate-pulse">Initializing Portal</p>
         </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-surface-900 flex items-center justify-center p-6 relative overflow-hidden">
-        <div className="glow-mesh" />
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-12 md:p-16 max-w-xl w-full text-center relative z-10"
-        >
-          <div className="w-20 h-20 bg-brand-primary rounded-3xl flex items-center justify-center text-white mx-auto mb-10 shadow-2xl shadow-brand-primary/40 animate-float">
-            <Zap size={40} fill="currentColor" />
-          </div>
-          <h1 className="text-5xl font-bold mb-6 tracking-tighter">GUJJU SMM</h1>
-          <p className="text-gray-500 mb-12 text-lg leading-relaxed">
-            The most advanced self-driven SMM portal. <br />
-            Manage your social growth with precision.
-          </p>
-          <button onClick={login} className="btn-modern btn-brand w-full py-6 text-xl shadow-2xl shadow-brand-primary/20">
-            Enter Portal
-          </button>
-          <p className="mt-8 text-[10px] font-bold text-gray-700 uppercase tracking-widest">Secure • Fast • Reliable</p>
-        </motion.div>
       </div>
     );
   }
