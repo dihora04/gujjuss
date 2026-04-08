@@ -11,6 +11,7 @@
 //   - photoURL: string (optional)
 //   - balance: number (required, >= 0)
 //   - role: string (required, ['user', 'admin'])
+//   - walletAddress: string (optional)
 //   - createdAt: string (format: date-time)
 //
 // Collection: services
@@ -87,7 +88,8 @@ service cloud.firestore {
              isValidEmail(data.email) &&
              data.balance is number && data.balance >= 0 &&
              data.role in ['user', 'admin'] &&
-             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'balance', 'role', 'freeDemoClaimed', 'createdAt']);
+             (!('walletAddress' in data) || (data.walletAddress is string && data.walletAddress.size() <= 100)) &&
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'balance', 'role', 'walletAddress', 'freeDemoClaimed', 'createdAt']);
     }
 
     function isValidService(data) {
@@ -130,7 +132,9 @@ service cloud.firestore {
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
         (isOwner(userId) && request.resource.data.role == resource.data.role && (
           request.resource.data.balance == resource.data.balance || 
-          (request.resource.data.freeDemoClaimed == true && resource.data.freeDemoClaimed != true)
+          (resource.data.balance == 0 && request.resource.data.balance == 50) ||
+          (request.resource.data.freeDemoClaimed == true && resource.data.freeDemoClaimed != true) ||
+          (request.resource.data.walletAddress != resource.data.walletAddress)
         )) ||
         isAdmin()
       );

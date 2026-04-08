@@ -30,6 +30,12 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 // --- Context ---
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -120,15 +126,17 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
   );
 };
 
-const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
+const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string, serviceId?: string) => void }) => {
   const { profile } = useAuth();
   const [stats, setStats] = useState({ totalOrders: 0, activeOrders: 0, totalSpent: 0 });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
     const q = query(collection(db, 'orders'), where('userId', '==', profile.uid), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
+    const unsubscribeOrders = onSnapshot(q, (snapshot) => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setRecentOrders(orders.slice(0, 5));
       setStats({
@@ -137,11 +145,48 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
         totalSpent: orders.reduce((acc, o) => acc + o.charge, 0)
       });
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
+
+    const sq = query(collection(db, 'services'), where('active', '==', true));
+    const unsubscribeServices = onSnapshot(sq, (snapshot) => {
+      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'services'));
+
+    return () => {
+      unsubscribeOrders();
+      unsubscribeServices();
+    };
   }, [profile]);
 
+  const handleQuickBuy = (service: Service) => {
+    setActiveTab('new-order', service.id);
+  };
+
+  const setupDefaultServices = async () => {
+    setLoading(true);
+    const defaultServices = [
+      { category: 'Instagram', name: 'Instagram Followers [Indian - Real]', price: 80.00, min: 100, max: 10000, description: 'High quality Indian followers with profile pictures.' },
+      { category: 'Instagram', name: 'Instagram Followers [USA - HQ]', price: 120.00, min: 100, max: 20000, description: 'High quality USA based followers.' },
+      { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
+      { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
+      { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
+      { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 100, description: 'Custom comments from real accounts.' },
+      { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' }
+    ];
+    try {
+      for (const s of defaultServices) {
+        await addDoc(collection(db, 'services'), { ...s, active: true });
+      }
+      toast.success('Services seeded successfully!');
+    } catch (e) {
+      toast.error('Seeding failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const cards = [
-    { label: 'Balance', value: `$${profile?.balance.toFixed(2)}`, icon: <Wallet size={20} />, color: 'text-brand-primary' },
-    { label: 'Total Spent', value: `$${stats.totalSpent.toFixed(2)}`, icon: <TrendingUp size={20} />, color: 'text-brand-secondary' },
+    { label: 'Balance', value: `₹${profile?.balance.toFixed(2)}`, icon: <Wallet size={20} />, color: 'text-brand-primary' },
+    { label: 'Total Spent', value: `₹${stats.totalSpent.toFixed(2)}`, icon: <TrendingUp size={20} />, color: 'text-brand-secondary' },
     { label: 'Active Orders', value: stats.activeOrders, icon: <Clock size={20} />, color: 'text-amber-500' },
     { label: 'Total Orders', value: stats.totalOrders, icon: <Package size={20} />, color: 'text-emerald-500' },
   ];
@@ -178,48 +223,92 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 glass-card overflow-hidden">
-          <div className="p-8 border-b border-white/5 flex items-center justify-between">
-            <h3 className="text-xl font-bold">Recent Activity</h3>
-            <button onClick={() => setActiveTab('orders')} className="text-xs font-bold text-brand-primary hover:text-white transition-colors">View All</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5">
-                  <th className="px-8 py-4">Service</th>
-                  <th className="px-8 py-4">Status</th>
-                  <th className="px-8 py-4 text-right">Charge</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-8 py-16 text-center">
-                      <Inbox size={40} className="mx-auto mb-4 text-gray-700" />
-                      <p className="text-sm text-gray-500">No orders found</p>
-                    </td>
+        <div className="lg:col-span-2 space-y-8">
+          {services.length === 0 ? (
+            <div className="glass-card p-12 text-center">
+              <AlertCircle size={48} className="mx-auto mb-6 text-amber-500" />
+              <h3 className="text-2xl font-bold mb-4">No Services Available</h3>
+              <p className="text-gray-500 mb-8">Start your portal by setting up the default services.</p>
+              <button 
+                onClick={setupDefaultServices}
+                disabled={loading}
+                className="btn-modern btn-brand px-12 py-4"
+              >
+                {loading ? 'Setting up...' : 'Setup Default Services Now'}
+              </button>
+            </div>
+          ) : (
+            <div className="glass-card overflow-hidden">
+              <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                <h3 className="text-xl font-bold">Quick Buy Services</h3>
+                <button onClick={() => setActiveTab('new-order')} className="text-xs font-bold text-brand-primary hover:text-white transition-colors">View All</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+                {services.slice(0, 6).map(service => (
+                  <div key={service.id} className="p-5 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-2 rounded-xl bg-brand-primary/10 text-brand-primary">
+                        <Zap size={16} fill="currentColor" />
+                      </div>
+                      <span className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest">₹{service.price}/1K</span>
+                    </div>
+                    <h4 className="text-sm font-bold text-white mb-2 group-hover:text-brand-primary transition-colors">{service.name}</h4>
+                    <p className="text-[10px] text-gray-500 mb-4 line-clamp-1">{service.description}</p>
+                    <button 
+                      onClick={() => handleQuickBuy(service)}
+                      className="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-primary hover:border-brand-primary hover:text-white transition-all"
+                    >
+                      Buy Now
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="glass-card overflow-hidden">
+            <div className="p-8 border-b border-white/5 flex items-center justify-between">
+              <h3 className="text-xl font-bold">Recent Activity</h3>
+              <button onClick={() => setActiveTab('orders')} className="text-xs font-bold text-brand-primary hover:text-white transition-colors">View All</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5">
+                    <th className="px-8 py-4">Service</th>
+                    <th className="px-8 py-4">Status</th>
+                    <th className="px-8 py-4 text-right">Charge</th>
                   </tr>
-                ) : (
-                  recentOrders.map(order => (
-                    <tr key={order.id} className="group hover:bg-white/[0.02] transition-colors">
-                      <td className="px-8 py-5">
-                        <div className="text-sm font-bold text-white mb-1">{order.serviceName}</div>
-                        <div className="text-[10px] text-gray-500 font-mono truncate max-w-[200px]">{order.link}</div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className={`badge-modern status-${order.status}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right font-mono text-sm text-white">
-                        ${order.charge.toFixed(2)}
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {recentOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-8 py-16 text-center">
+                        <Inbox size={40} className="mx-auto mb-4 text-gray-700" />
+                        <p className="text-sm text-gray-500">No orders found</p>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    recentOrders.map(order => (
+                      <tr key={order.id} className="group hover:bg-white/[0.02] transition-colors">
+                        <td className="px-8 py-5">
+                          <div className="text-sm font-bold text-white mb-1">{order.serviceName}</div>
+                          <div className="text-[10px] text-gray-500 font-mono truncate max-w-[200px]">{order.link}</div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className={`badge-modern status-${order.status}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-right font-mono text-sm text-white">
+                          ₹{order.charge.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -235,6 +324,12 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
                 <ArrowUpRight size={24} className="mx-auto mb-3 text-brand-secondary group-hover:scale-110 transition-transform" />
                 <span className="text-[10px] font-bold uppercase tracking-widest">Deposit</span>
               </button>
+              {profile?.role === 'admin' && (
+                <button onClick={setupDefaultServices} disabled={loading} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-center group col-span-2">
+                  <Plus size={24} className="mx-auto mb-3 text-emerald-500 group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{loading ? 'Setting up...' : 'Setup Default Services'}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -260,7 +355,11 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) =>
   );
 };
 
-const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
+const NewOrder = ({ setActiveTab, preSelectedServiceId, onClearPreSelect }: { 
+  setActiveTab: (tab: string) => void, 
+  preSelectedServiceId?: string | null,
+  onClearPreSelect?: () => void
+}) => {
   const { profile } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -278,8 +377,18 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
       const cats = Array.from(new Set(svcs.map(s => s.category)));
       setCategories(cats);
       if (cats.length > 0 && !selectedCategory) setSelectedCategory(cats[0]);
+
+      // Handle pre-selection
+      if (preSelectedServiceId) {
+        const preSelected = svcs.find(s => s.id === preSelectedServiceId);
+        if (preSelected) {
+          setSelectedCategory(preSelected.category);
+          setSelectedService(preSelected);
+          if (onClearPreSelect) onClearPreSelect();
+        }
+      }
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'services'));
-  }, []);
+  }, [preSelectedServiceId]);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -327,9 +436,38 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
         <div className="glass-card p-12 max-w-lg w-full text-center">
           <AlertCircle size={48} className="mx-auto mb-6 text-amber-500" />
           <h2 className="text-2xl font-bold mb-4">No Services Available</h2>
-          <p className="text-gray-500 mb-8">Please check back later or contact support.</p>
-          {profile?.role === 'admin' && (
-            <button onClick={() => setActiveTab('admin')} className="btn-modern btn-brand w-full">Go to Admin Panel</button>
+          <p className="text-gray-500 mb-8">The service catalog is empty. As an admin, you can set up the default services instantly.</p>
+          {profile?.role === 'admin' ? (
+            <button 
+              onClick={async () => {
+                setLoading(true);
+                const defaultServices = [
+                  { category: 'Instagram', name: 'Instagram Followers [Indian - Real]', price: 80.00, min: 100, max: 10000, description: 'High quality Indian followers with profile pictures.' },
+                  { category: 'Instagram', name: 'Instagram Followers [USA - HQ]', price: 120.00, min: 100, max: 20000, description: 'High quality USA based followers.' },
+                  { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
+                  { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
+                  { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
+                  { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 100, description: 'Custom comments from real accounts.' },
+                  { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' }
+                ];
+                try {
+                  for (const s of defaultServices) {
+                    await addDoc(collection(db, 'services'), { ...s, active: true });
+                  }
+                  toast.success('Services seeded successfully!');
+                } catch (e) {
+                  toast.error('Seeding failed');
+                } finally {
+                  setLoading(false);
+                }
+              }} 
+              disabled={loading}
+              className="btn-modern btn-brand w-full py-4"
+            >
+              {loading ? 'Setting up...' : 'Setup Default Services Now'}
+            </button>
+          ) : (
+            <p className="text-xs text-gray-600">Please contact the administrator to configure services.</p>
           )}
         </div>
       </div>
@@ -369,7 +507,7 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
                   >
                     <option value="" className="bg-surface-800">Select a service</option>
                     {services.filter(s => s.category === selectedCategory).map(s => (
-                      <option key={s.id} value={s.id} className="bg-surface-800">{s.name} — ${s.price}/1K</option>
+                      <option key={s.id} value={s.id} className="bg-surface-800">{s.name} — ₹{s.price}/1K</option>
                     ))}
                   </select>
                 </div>
@@ -420,7 +558,7 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
               <div className="p-8 rounded-3xl bg-brand-primary text-white flex justify-between items-center shadow-2xl shadow-brand-primary/30">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Total Charge</p>
-                  <p className="text-3xl font-bold font-display">${charge}</p>
+                  <p className="text-3xl font-bold font-display">₹{charge}</p>
                 </div>
                 <button 
                   type="submit" 
@@ -437,7 +575,7 @@ const NewOrder = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => 
         <div className="space-y-8">
           <div className="glass-card p-8">
             <h3 className="text-lg font-bold mb-6">Your Balance</h3>
-            <div className="text-4xl font-bold text-white mb-2">${profile?.balance.toFixed(2)}</div>
+            <div className="text-4xl font-bold text-white mb-2">₹{profile?.balance.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mb-6">Available for immediate use</p>
             <button onClick={() => setActiveTab('wallet')} className="btn-modern btn-outline w-full">Add Funds</button>
           </div>
@@ -520,7 +658,7 @@ const OrderHistory = () => {
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-8 py-6 font-mono text-sm text-white">${order.charge.toFixed(2)}</td>
+                    <td className="px-8 py-6 font-mono text-sm text-white">₹{order.charge.toFixed(2)}</td>
                     <td className="px-8 py-6 text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
                   </tr>
                 ))
@@ -535,6 +673,43 @@ const OrderHistory = () => {
 
 const WalletPanel = () => {
   const { profile } = useAuth();
+  const [connecting, setConnecting] = useState(false);
+
+  const handleConnectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      toast.error('MetaMask is not installed. Please install it to connect.');
+      return;
+    }
+
+    setConnecting(true);
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts found. Please unlock your MetaMask.');
+      }
+      const address = accounts[0];
+      
+      if (profile) {
+        await updateDoc(doc(db, 'users', profile.uid), {
+          walletAddress: address
+        });
+        toast.success('Wallet connected successfully!');
+      } else {
+        toast.error('User profile not loaded. Please refresh.');
+      }
+    } catch (error: any) {
+      console.error('MetaMask connection error:', error);
+      if (error.code === 4001) {
+        toast.error('Connection request rejected.');
+      } else if (error.message) {
+        toast.error(`MetaMask Error: ${error.message}`);
+      } else {
+        toast.error('Failed to connect to MetaMask. Please try again.');
+      }
+    } finally {
+      setConnecting(false);
+    }
+  };
   
   return (
     <div className="p-6 md:p-12 max-w-7xl mx-auto">
@@ -548,7 +723,7 @@ const WalletPanel = () => {
           <div className="glass-card p-10 bg-gradient-to-br from-brand-primary to-brand-secondary text-white relative overflow-hidden mb-8">
             <div className="relative z-10">
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-2">Available Balance</p>
-              <h2 className="text-5xl font-bold font-display mb-12">${profile?.balance.toFixed(2)}</h2>
+              <h2 className="text-5xl font-bold font-display mb-12">₹{profile?.balance.toFixed(2)}</h2>
               <div className="flex items-center gap-2 text-xs font-bold opacity-80">
                 <Shield size={14} />
                 <span>Secure Wallet</span>
@@ -570,9 +745,26 @@ const WalletPanel = () => {
               <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-primary/10 border border-brand-primary/20">
                 <div className="flex items-center gap-3">
                   <Wallet size={20} className="text-brand-primary" />
-                  <span className="text-sm font-bold text-white">Crypto / Manual</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-white">MetaMask / Crypto</span>
+                    {profile?.walletAddress && (
+                      <span className="text-[8px] font-mono text-gray-500 truncate max-w-[120px]">
+                        {profile.walletAddress}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">Active</span>
+                {profile?.walletAddress ? (
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Connected</span>
+                ) : (
+                  <button 
+                    onClick={handleConnectWallet}
+                    disabled={connecting}
+                    className="text-[10px] font-bold text-brand-primary uppercase tracking-widest hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    {connecting ? 'Connecting...' : 'Connect'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -607,16 +799,21 @@ const AdminPanel = () => {
   const handleSeed = async () => {
     setLoading(true);
     const services = [
-      { category: 'Instagram', name: 'Instagram Followers [Real]', price: 1.50, min: 100, max: 50000, description: 'High quality real looking followers.' },
-      { category: 'Instagram', name: 'Instagram Likes [Instant]', price: 0.50, min: 50, max: 20000, description: 'Instant delivery likes for your posts.' },
-      { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 3.20, min: 500, max: 100000, description: 'High retention YouTube views.' },
-      { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 2.10, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' }
+      { category: 'Instagram', name: 'Instagram Followers [Indian - Real]', price: 80.00, min: 100, max: 10000, description: 'High quality Indian followers with profile pictures.' },
+      { category: 'Instagram', name: 'Instagram Followers [USA - HQ]', price: 120.00, min: 100, max: 20000, description: 'High quality USA based followers.' },
+      { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
+      { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
+      { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
+      { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 1000, description: 'Custom comments from real accounts.' },
+      { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' },
+      { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 250.00, min: 500, max: 100000, description: 'High retention YouTube views.' },
+      { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 180.00, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' }
     ];
     try {
       for (const s of services) {
         await addDoc(collection(db, 'services'), { ...s, active: true });
       }
-      toast.success('Services seeded!');
+      toast.success('Services seeded successfully!');
     } catch (e) {
       toast.error('Seeding failed');
     } finally {
@@ -705,13 +902,20 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const docRef = doc(db, 'users', u.uid);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
-          setProfile(snap.data() as UserProfile);
+          const data = snap.data() as UserProfile;
+          // One-time credit for existing users with 0 balance
+          if (data.balance === 0) {
+            await updateDoc(docRef, { balance: 50.00 });
+            setProfile({ ...data, balance: 50.00 });
+          } else {
+            setProfile(data);
+          }
         } else {
           const newProfile: UserProfile = {
             uid: u.uid,
             email: u.email || 'admin@gujjusmm.com',
             displayName: u.displayName || 'Admin User',
-            balance: 1000.00, // Generous starting balance
+            balance: 50.00, // 50 Rs credit for every user
             role: 'admin', // Default to admin for direct portal
             createdAt: new Date().toISOString()
           };
@@ -756,6 +960,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 const AppContent = () => {
   const { loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [preSelectedServiceId, setPreSelectedServiceId] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -781,8 +986,11 @@ const AppContent = () => {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
-            {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-            {activeTab === 'new-order' && <NewOrder setActiveTab={setActiveTab} />}
+            {activeTab === 'dashboard' && <Dashboard setActiveTab={(tab, serviceId) => {
+              setActiveTab(tab);
+              if (serviceId) setPreSelectedServiceId(serviceId);
+            }} />}
+            {activeTab === 'new-order' && <NewOrder setActiveTab={setActiveTab} preSelectedServiceId={preSelectedServiceId} onClearPreSelect={() => setPreSelectedServiceId(null)} />}
             {activeTab === 'orders' && <OrderHistory />}
             {activeTab === 'wallet' && <WalletPanel />}
             {activeTab === 'admin' && <AdminPanel />}
