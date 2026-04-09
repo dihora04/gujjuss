@@ -30,12 +30,6 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
-
 // --- Context ---
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -169,8 +163,15 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string, serviceId?: s
       { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
       { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
       { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
-      { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 100, description: 'Custom comments from real accounts.' },
-      { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' }
+      { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 1000, description: 'Custom comments from real accounts.' },
+      { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' },
+      { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 250.00, min: 500, max: 100000, description: 'High retention YouTube views.' },
+      { category: 'YouTube', name: 'YouTube Subscribers [HQ]', price: 1500.00, min: 100, max: 5000, description: 'High quality YouTube subscribers.' },
+      { category: 'YouTube', name: 'YouTube Watch Time [4000 Hours]', price: 4500.00, min: 1000, max: 4000, description: 'Monetization watch time package.' },
+      { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 180.00, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' },
+      { category: 'TikTok', name: 'TikTok Likes [Instant]', price: 60.00, min: 100, max: 20000, description: 'Instant TikTok likes.' },
+      { category: 'Facebook', name: 'Facebook Page Likes [Global]', price: 120.00, min: 100, max: 10000, description: 'Global Facebook page likes.' },
+      { category: 'Twitter', name: 'Twitter Followers [Real]', price: 350.00, min: 100, max: 5000, description: 'Real Twitter followers.' }
     ];
     try {
       for (const s of defaultServices) {
@@ -437,38 +438,41 @@ const NewOrder = ({ setActiveTab, preSelectedServiceId, onClearPreSelect }: {
           <AlertCircle size={48} className="mx-auto mb-6 text-amber-500" />
           <h2 className="text-2xl font-bold mb-4">No Services Available</h2>
           <p className="text-gray-500 mb-8">The service catalog is empty. As an admin, you can set up the default services instantly.</p>
-          {profile?.role === 'admin' ? (
-            <button 
-              onClick={async () => {
-                setLoading(true);
-                const defaultServices = [
-                  { category: 'Instagram', name: 'Instagram Followers [Indian - Real]', price: 80.00, min: 100, max: 10000, description: 'High quality Indian followers with profile pictures.' },
-                  { category: 'Instagram', name: 'Instagram Followers [USA - HQ]', price: 120.00, min: 100, max: 20000, description: 'High quality USA based followers.' },
-                  { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
-                  { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
-                  { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
-                  { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 100, description: 'Custom comments from real accounts.' },
-                  { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' }
-                ];
-                try {
-                  for (const s of defaultServices) {
-                    await addDoc(collection(db, 'services'), { ...s, active: true });
-                  }
-                  toast.success('Services seeded successfully!');
-                } catch (e) {
-                  toast.error('Seeding failed');
-                } finally {
-                  setLoading(false);
+          <button 
+            onClick={async () => {
+              setLoading(true);
+              const defaultServices = [
+                { category: 'Instagram', name: 'Instagram Followers [Indian - Real]', price: 80.00, min: 100, max: 10000, description: 'High quality Indian followers with profile pictures.' },
+                { category: 'Instagram', name: 'Instagram Followers [USA - HQ]', price: 120.00, min: 100, max: 20000, description: 'High quality USA based followers.' },
+                { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
+                { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
+                { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
+                { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 1000, description: 'Custom comments from real accounts.' },
+                { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' },
+                { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 250.00, min: 500, max: 100000, description: 'High retention YouTube views.' },
+                { category: 'YouTube', name: 'YouTube Subscribers [HQ]', price: 1500.00, min: 100, max: 5000, description: 'High quality YouTube subscribers.' },
+                { category: 'YouTube', name: 'YouTube Watch Time [4000 Hours]', price: 4500.00, min: 1000, max: 4000, description: 'Monetization watch time package.' },
+                { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 180.00, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' },
+                { category: 'TikTok', name: 'TikTok Likes [Instant]', price: 60.00, min: 100, max: 20000, description: 'Instant TikTok likes.' },
+                { category: 'Facebook', name: 'Facebook Page Likes [Global]', price: 120.00, min: 100, max: 10000, description: 'Global Facebook page likes.' },
+                { category: 'Twitter', name: 'Twitter Followers [Real]', price: 350.00, min: 100, max: 5000, description: 'Real Twitter followers.' }
+              ];
+              try {
+                for (const s of defaultServices) {
+                  await addDoc(collection(db, 'services'), { ...s, active: true });
                 }
-              }} 
-              disabled={loading}
-              className="btn-modern btn-brand w-full py-4"
-            >
-              {loading ? 'Setting up...' : 'Setup Default Services Now'}
-            </button>
-          ) : (
-            <p className="text-xs text-gray-600">Please contact the administrator to configure services.</p>
-          )}
+                toast.success('Services seeded successfully!');
+              } catch (e) {
+                toast.error('Seeding failed');
+              } finally {
+                setLoading(false);
+              }
+            }} 
+            disabled={loading}
+            className="btn-modern btn-brand w-full py-4"
+          >
+            {loading ? 'Setting up...' : 'Setup Default Services Now'}
+          </button>
         </div>
       </div>
     );
@@ -673,43 +677,6 @@ const OrderHistory = () => {
 
 const WalletPanel = () => {
   const { profile } = useAuth();
-  const [connecting, setConnecting] = useState(false);
-
-  const handleConnectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      toast.error('MetaMask is not installed. Please install it to connect.');
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts found. Please unlock your MetaMask.');
-      }
-      const address = accounts[0];
-      
-      if (profile) {
-        await updateDoc(doc(db, 'users', profile.uid), {
-          walletAddress: address
-        });
-        toast.success('Wallet connected successfully!');
-      } else {
-        toast.error('User profile not loaded. Please refresh.');
-      }
-    } catch (error: any) {
-      console.error('MetaMask connection error:', error);
-      if (error.code === 4001) {
-        toast.error('Connection request rejected.');
-      } else if (error.message) {
-        toast.error(`MetaMask Error: ${error.message}`);
-      } else {
-        toast.error('Failed to connect to MetaMask. Please try again.');
-      }
-    } finally {
-      setConnecting(false);
-    }
-  };
   
   return (
     <div className="p-6 md:p-12 max-w-7xl mx-auto">
@@ -745,26 +712,9 @@ const WalletPanel = () => {
               <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-primary/10 border border-brand-primary/20">
                 <div className="flex items-center gap-3">
                   <Wallet size={20} className="text-brand-primary" />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-white">MetaMask / Crypto</span>
-                    {profile?.walletAddress && (
-                      <span className="text-[8px] font-mono text-gray-500 truncate max-w-[120px]">
-                        {profile.walletAddress}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-sm font-bold text-white">Manual Deposit</span>
                 </div>
-                {profile?.walletAddress ? (
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Connected</span>
-                ) : (
-                  <button 
-                    onClick={handleConnectWallet}
-                    disabled={connecting}
-                    className="text-[10px] font-bold text-brand-primary uppercase tracking-widest hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    {connecting ? 'Connecting...' : 'Connect'}
-                  </button>
-                )}
+                <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">Active</span>
               </div>
             </div>
           </div>
@@ -807,7 +757,12 @@ const AdminPanel = () => {
       { category: 'Instagram', name: 'Instagram Comments [Custom]', price: 150.00, min: 10, max: 1000, description: 'Custom comments from real accounts.' },
       { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' },
       { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 250.00, min: 500, max: 100000, description: 'High retention YouTube views.' },
-      { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 180.00, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' }
+      { category: 'YouTube', name: 'YouTube Subscribers [HQ]', price: 1500.00, min: 100, max: 5000, description: 'High quality YouTube subscribers.' },
+      { category: 'YouTube', name: 'YouTube Watch Time [4000 Hours]', price: 4500.00, min: 1000, max: 4000, description: 'Monetization watch time package.' },
+      { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 180.00, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' },
+      { category: 'TikTok', name: 'TikTok Likes [Instant]', price: 60.00, min: 100, max: 20000, description: 'Instant TikTok likes.' },
+      { category: 'Facebook', name: 'Facebook Page Likes [Global]', price: 120.00, min: 100, max: 10000, description: 'Global Facebook page likes.' },
+      { category: 'Twitter', name: 'Twitter Followers [Real]', price: 350.00, min: 100, max: 5000, description: 'Real Twitter followers.' }
     ];
     try {
       for (const s of services) {
@@ -903,6 +858,11 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           const data = snap.data() as UserProfile;
+          // Force admin for primary user
+          if (u.email === 'dihora04@gmail.com' && data.role !== 'admin') {
+            await updateDoc(docRef, { role: 'admin' });
+            data.role = 'admin';
+          }
           // One-time credit for existing users with 0 balance
           if (data.balance === 0) {
             await updateDoc(docRef, { balance: 50.00 });
@@ -916,7 +876,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: u.email || 'admin@gujjusmm.com',
             displayName: u.displayName || 'Admin User',
             balance: 50.00, // 50 Rs credit for every user
-            role: 'admin', // Default to admin for direct portal
+            role: (u.email === 'dihora04@gmail.com') ? 'admin' : 'user',
             createdAt: new Date().toISOString()
           };
           await setDoc(docRef, newProfile);
