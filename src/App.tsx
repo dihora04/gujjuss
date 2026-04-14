@@ -1,6 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
-import { onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
+import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, orderBy, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { UserProfile, Service, Order, Transaction, DepositRequest } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -34,10 +33,10 @@ import { Toaster, toast } from 'react-hot-toast';
 
 // --- Context ---
 interface AuthContextType {
-  user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: (method?: 'anonymous' | 'google') => Promise<void>;
+  login: (username: string, pass: string) => Promise<void>;
+  register: (username: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -52,7 +51,7 @@ const useAuth = () => {
 // --- Components ---
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) => {
-  const { profile, logout, login } = useAuth();
+  const { profile, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
@@ -114,16 +113,6 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
               <LogOut size={18} />
               <span>Sign Out</span>
             </button>
-
-            {!profile?.email.includes('@') && (
-              <button 
-                onClick={() => login('google')}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-brand-primary hover:bg-brand-primary/10 transition-all border border-brand-primary/20"
-              >
-                <Shield size={16} />
-                <span className="text-xs font-bold">Master Admin Login</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -836,16 +825,18 @@ const WalletPanel = () => {
 };
 
 const AdminOrders = () => {
+  const { profile } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (profile?.role !== 'admin') return;
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
       setLoading(false);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
-  }, []);
+  }, [profile]);
 
   const updateStatus = async (orderId: string, status: Order['status']) => {
     try {
@@ -910,16 +901,18 @@ const AdminOrders = () => {
 };
 
 const AdminDeposits = () => {
+  const { profile } = useAuth();
   const [requests, setRequests] = useState<DepositRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (profile?.role !== 'admin') return;
     const q = query(collection(db, 'depositRequests'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
       setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DepositRequest)));
       setLoading(false);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'depositRequests'));
-  }, []);
+  }, [profile]);
 
   const handleApproval = async (request: DepositRequest, status: 'approved' | 'rejected') => {
     try {
@@ -1138,84 +1131,213 @@ const AdminPanel = () => {
 };
 
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-        const docRef = doc(db, 'users', u.uid);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const data = snap.data() as UserProfile;
-          // Force admin for primary user
-          if (u.email === 'dihora04@gmail.com' && data.role !== 'admin') {
-            await updateDoc(docRef, { role: 'admin' });
-            data.role = 'admin';
-          }
-          // One-time credit for existing users with 0 balance
-          if (data.balance === 0) {
-            await updateDoc(docRef, { balance: 50.00 });
-            setProfile({ ...data, balance: 50.00 });
-          } else {
-            setProfile(data);
-          }
-        } else {
-          const newProfile: UserProfile = {
-            uid: u.uid,
-            email: u.email || 'admin@gujjusmm.com',
-            displayName: u.displayName || 'Admin User',
-            balance: 50.00, // 50 Rs credit for every user
-            role: (u.email === 'dihora04@gmail.com') ? 'admin' : 'user',
-            createdAt: new Date().toISOString()
-          };
-          await setDoc(docRef, newProfile);
-          setProfile(newProfile);
-        }
-        setLoading(false);
-      } else {
-        // Automatically sign in if not authenticated
-        try {
-          await signInAnonymously(auth);
-        } catch (e) {
-          console.error("Auto-login failed:", e);
-          setLoading(false);
-        }
-      }
-    });
+    const savedProfile = localStorage.getItem('gujju_smm_profile');
+    if (savedProfile) {
+      setProfile(JSON.parse(savedProfile));
+    }
+    setLoading(false);
   }, []);
 
-  const login = async (method: 'anonymous' | 'google' = 'anonymous') => {
+  const login = async (username: string, pass: string) => {
     setLoading(true);
     try {
-      if (method === 'google') {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
+      // Master Admin Check
+      if (username === 'Chirag' && pass === 'Chirag@789') {
+        const adminProfile: UserProfile = {
+          uid: 'admin_chirag',
+          email: 'chirag@gujjusmm.com',
+          displayName: 'Master Admin Chirag',
+          balance: 999999,
+          role: 'admin',
+          createdAt: new Date().toISOString()
+        };
+        setProfile(adminProfile);
+        localStorage.setItem('gujju_smm_profile', JSON.stringify(adminProfile));
+        toast.success('Welcome back, Master Admin');
+        return;
+      }
+
+      // Normal User Login
+      const docRef = doc(db, 'users', username.toLowerCase());
+      const snap = await getDoc(docRef);
+      
+      if (snap.exists()) {
+        const data = snap.data() as any;
+        if (data.password === pass) {
+          const userProfile: UserProfile = {
+            uid: username.toLowerCase(),
+            email: data.email || `${username}@gujjusmm.com`,
+            displayName: data.displayName || username,
+            balance: data.balance || 0,
+            role: (data.role as 'user' | 'admin') || 'user',
+            createdAt: data.createdAt
+          };
+          setProfile(userProfile);
+          localStorage.setItem('gujju_smm_profile', JSON.stringify(userProfile));
+          toast.success(`Welcome back, ${username}`);
+        } else {
+          toast.error('Invalid password');
+        }
       } else {
-        await signInAnonymously(auth);
+        toast.error('User not found. Please register.');
       }
     } catch (e) {
       toast.error('Login failed');
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (username: string, pass: string) => {
+    setLoading(true);
+    try {
+      const docRef = doc(db, 'users', username.toLowerCase());
+      const snap = await getDoc(docRef);
+      
+      if (snap.exists()) {
+        toast.error('Username already exists');
+      } else {
+        const newProfile = {
+          uid: username.toLowerCase(),
+          username: username.toLowerCase(),
+          password: pass,
+          email: `${username}@gujjusmm.com`,
+          displayName: username,
+          balance: 50.00, // Welcome bonus
+          role: 'user',
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(docRef, newProfile);
+        
+        const userProfile: UserProfile = {
+          uid: newProfile.uid,
+          email: newProfile.email,
+          displayName: newProfile.displayName,
+          balance: newProfile.balance,
+          role: newProfile.role as 'user' | 'admin',
+          createdAt: newProfile.createdAt
+        };
+        
+        setProfile(userProfile);
+        localStorage.setItem('gujju_smm_profile', JSON.stringify(userProfile));
+        toast.success('Registration successful! ₹50 bonus added.');
+      }
+    } catch (e) {
+      toast.error('Registration failed');
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    setProfile(null);
+    localStorage.removeItem('gujju_smm_profile');
+    toast.success('Logged out');
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
+    <AuthContext.Provider value={{ profile, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+const LoginScreen = () => {
+  const { login, register } = useAuth();
+  const [isRegister, setIsRegister] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    if (isRegister) {
+      await register(username, password);
+    } else {
+      await login(username, password);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-surface-900 flex items-center justify-center p-6">
+      <div className="glow-mesh" />
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card p-12 max-w-md w-full"
+      >
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-brand-primary rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-brand-primary/20 mx-auto mb-8">
+            <Zap size={40} fill="currentColor" />
+          </div>
+          <h1 className="text-4xl font-bold mb-4">GUJJU SMM</h1>
+          <p className="text-gray-500">The ultimate social media growth portal</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="label-modern">Username</label>
+            <input 
+              type="text" 
+              className="input-modern" 
+              placeholder="Enter username"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              required 
+            />
+          </div>
+          <div>
+            <label className="label-modern">Password</label>
+            <input 
+              type="password" 
+              className="input-modern" 
+              placeholder="Enter password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required 
+            />
+          </div>
+          
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="btn-modern btn-brand w-full py-5 flex items-center justify-center gap-3"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-surface-950 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span>{isRegister ? 'Create Account' : 'Login to Portal'}</span>
+            )}
+          </button>
+        </form>
+
+        <div className="mt-8 text-center">
+          <button 
+            onClick={() => setIsRegister(!isRegister)}
+            className="text-sm font-bold text-gray-500 hover:text-brand-primary transition-colors"
+          >
+            {isRegister ? 'Already have an account? Login' : 'New to Gujju SMM? Register Now'}
+          </button>
+        </div>
+
+        <p className="mt-12 text-center text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em]">
+          Secure In-House Login System
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
 const AppContent = () => {
-  const { loading } = useAuth();
+  const { loading, profile } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [preSelectedServiceId, setPreSelectedServiceId] = useState<string | null>(null);
 
@@ -1235,6 +1357,10 @@ const AppContent = () => {
         </div>
       </div>
     );
+  }
+
+  if (!profile) {
+    return <LoginScreen />;
   }
 
   return (

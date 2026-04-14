@@ -52,72 +52,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Helper Functions
+    // Helper Functions (Self-Sustained Mode)
     // ===============================================================
 
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "dihora04@gmail.com" && request.auth.token.email_verified == true));
-    }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidDateString(dateStr) {
-      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'email', 'balance', 'role']) &&
-             data.uid == request.auth.uid &&
-             isValidEmail(data.email) &&
-             data.balance is number && data.balance >= 0 &&
-             data.role in ['user', 'admin'] &&
-             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'balance', 'role', 'freeDemoClaimed', 'createdAt']);
-    }
-
-    function isValidService(data) {
-      return data.keys().hasAll(['category', 'name', 'price', 'min', 'max', 'active']) &&
-             data.category is string && data.category.size() > 0 && data.category.size() < 100 &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
-             data.price is number && data.price > 0 &&
-             data.min is number && data.min > 0 &&
-             data.max is number && data.max >= data.min &&
-             data.active is bool;
-    }
-
-    function isValidOrder(data) {
-      return data.keys().hasAll(['userId', 'serviceId', 'serviceName', 'link', 'quantity', 'charge', 'status', 'createdAt']) &&
-             data.userId == request.auth.uid &&
-             data.serviceId is string &&
-             data.serviceName is string &&
-             data.link is string && data.link.size() > 0 && data.link.size() < 500 &&
-             data.quantity is number && data.quantity > 0 &&
-             data.charge is number && data.charge >= 0 &&
-             data.status in ['pending', 'processing', 'completed', 'cancelled', 'refunded'] &&
-             isValidDateString(data.createdAt);
-    }
-
-    function isValidTransaction(data) {
-      return data.keys().hasAll(['userId', 'amount', 'type', 'createdAt']) &&
-             data.userId == request.auth.uid &&
-             data.amount is number &&
-             data.type in ['deposit', 'order', 'refund'] &&
-             isValidDateString(data.createdAt);
+    function isPublic() {
+      return true; // Self-sustained mode: no Firebase Auth required
     }
 
     // ===============================================================
@@ -125,35 +64,23 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
-        (isOwner(userId) && request.resource.data.role == resource.data.role && (
-          request.resource.data.balance == resource.data.balance || 
-          (resource.data.balance == 0 && request.resource.data.balance == 50) ||
-          (request.resource.data.freeDemoClaimed == true && resource.data.freeDemoClaimed != true)
-        )) ||
-        isAdmin()
-      );
+      allow read, write: if isPublic();
     }
 
     match /services/{serviceId} {
-      allow read: if true; // Publicly readable for landing page
-      allow write: if isAdmin() && isValidService(request.resource.data);
+      allow read, write: if isPublic();
     }
 
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
-      allow update: if isAdmin() && isValidOrder(request.resource.data);
-      allow delete: if isAdmin();
+      allow read, write: if isPublic();
     }
 
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read, write: if isPublic();
+    }
+
+    match /depositRequests/{requestId} {
+      allow read, write: if isPublic();
     }
   }
 }
