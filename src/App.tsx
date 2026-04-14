@@ -774,13 +774,13 @@ const WalletPanel = () => {
               <h3 className="text-xl font-bold mb-6">Scan to Pay</h3>
               <div className="w-48 h-48 bg-white p-4 rounded-2xl mb-6 shadow-2xl shadow-brand-primary/20">
                 <img 
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=gujjusmm@upi&pn=GujjuSMM&am=0&cu=INR" 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=BHARATPE.8Y0N1B2X7Z60042@fbpe&pn=GujjuSMM&am=0&cu=INR" 
                   alt="QR Code" 
                   className="w-full h-full"
                 />
               </div>
               <p className="text-sm text-gray-400 mb-2">Scan this QR to pay via any UPI app</p>
-              <p className="text-xs font-mono text-brand-primary">gujjusmm@upi</p>
+              <p className="text-xs font-mono text-brand-primary">BHARATPE.8Y0N1B2X7Z60042@fbpe</p>
             </div>
 
             <div className="glass-card p-10">
