@@ -32,6 +32,16 @@ export interface Order {
   createdAt: string;
 }
 
+export interface DepositRequest {
+  id: string;
+  userId: string;
+  userEmail: string;
+  amount: number;
+  transactionId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
 export interface Transaction {
   id: string;
   userId: string;

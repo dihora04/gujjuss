@@ -1,9 +1,10 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
-import { onAuthStateChanged, signOut, signInAnonymously, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, orderBy, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-import { UserProfile, Service, Order, Transaction } from './types';
+import { UserProfile, Service, Order, Transaction, DepositRequest } from './types';
 import { motion, AnimatePresence } from 'motion/react';
+import { OrderFlow } from './components/OrderFlow';
 import { 
   LayoutDashboard, 
   Plus, 
@@ -26,7 +27,8 @@ import {
   Shield,
   Menu,
   X,
-  Inbox
+  Inbox,
+  Smartphone
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 
@@ -35,7 +37,7 @@ interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: () => Promise<void>;
+  login: (method?: 'anonymous' | 'google') => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -50,7 +52,7 @@ const useAuth = () => {
 // --- Components ---
 
 const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) => {
-  const { profile, logout } = useAuth();
+  const { profile, logout, login } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
@@ -96,20 +98,33 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string; setActiveTab:
           </nav>
         </div>
 
-        <div className="absolute bottom-0 left-0 w-full p-8 border-t border-white/5">
-          <div className="flex items-center gap-4 mb-6">
+        <div className="absolute bottom-0 left-0 w-full p-8 border-t border-white/5 space-y-4">
+          <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-brand-primary font-bold">
               {profile?.displayName?.[0] || 'U'}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{profile?.displayName || 'User'}</p>
-              <p className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">${profile?.balance.toFixed(2)}</p>
+              <p className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">₹{profile?.balance.toFixed(2)}</p>
             </div>
           </div>
-          <button onClick={logout} className="btn-modern btn-outline w-full justify-start text-gray-500 hover:text-white">
-            <LogOut size={18} />
-            <span>Sign Out</span>
-          </button>
+          
+          <div className="space-y-2">
+            <button onClick={logout} className="btn-modern btn-outline w-full justify-start text-gray-500 hover:text-white py-2.5">
+              <LogOut size={18} />
+              <span>Sign Out</span>
+            </button>
+
+            {!profile?.email.includes('@') && (
+              <button 
+                onClick={() => login('google')}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-brand-primary hover:bg-brand-primary/10 transition-all border border-brand-primary/20"
+              >
+                <Shield size={16} />
+                <span className="text-xs font-bold">Master Admin Login</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -249,7 +264,7 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string, serviceId?: s
                 <button onClick={() => setActiveTab('new-order')} className="text-xs font-bold text-brand-primary hover:text-white transition-colors">View All</button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
-                {services.slice(0, 6).map(service => (
+                {services.slice(0, 12).map(service => (
                   <div key={service.id} className="p-5 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all group">
                     <div className="flex justify-between items-start mb-4">
                       <div className="p-2 rounded-xl bg-brand-primary/10 text-brand-primary">
@@ -373,6 +388,8 @@ const NewOrder = ({ setActiveTab, preSelectedServiceId, onClearPreSelect }: {
   const [link, setLink] = useState('');
   const [quantity, setQuantity] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [showOrderFlow, setShowOrderFlow] = useState(false);
+  const [orderInfo, setOrderInfo] = useState<{ name: string, qty: number, user: string } | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'services'), where('active', '==', true));
@@ -426,14 +443,28 @@ const NewOrder = ({ setActiveTab, preSelectedServiceId, onClearPreSelect }: {
         balance: increment(-charge)
       });
 
-      toast.success('Order placed successfully!');
-      setActiveTab('orders');
+      setOrderInfo({ name: selectedService.name, qty: quantity, user: link });
+      setShowOrderFlow(true);
     } catch (error) {
       toast.error('Failed to place order');
     } finally {
       setLoading(false);
     }
   };
+
+  if (showOrderFlow && orderInfo) {
+    return (
+      <OrderFlow 
+        serviceName={orderInfo.name}
+        quantity={orderInfo.qty}
+        username={orderInfo.user}
+        onComplete={() => {
+          setShowOrderFlow(false);
+          setActiveTab('orders');
+        }}
+      />
+    );
+  }
 
   if (services.length === 0) {
     return (
@@ -685,42 +716,62 @@ const OrderHistory = () => {
 
 const WalletPanel = () => {
   const { profile } = useAuth();
-  
+  const [amount, setAmount] = useState<number>(0);
+  const [transactionId, setTransactionId] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleDepositRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || amount <= 0 || !transactionId) {
+      toast.error('Please fill all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const request: Omit<DepositRequest, 'id'> = {
+        userId: profile.uid,
+        userEmail: profile.email,
+        amount,
+        transactionId,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      await addDoc(collection(db, 'depositRequests'), request);
+      toast.success('Deposit request submitted! Waiting for admin approval.');
+      setAmount(0);
+      setTransactionId('');
+    } catch (error) {
+      toast.error('Failed to submit request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-12 max-w-7xl mx-auto">
       <div className="mb-12">
         <h1 className="text-4xl md:text-5xl font-bold mb-2">Wallet</h1>
-        <p className="text-gray-500">Manage your funds and payment methods</p>
+        <p className="text-gray-500">Add funds to your account</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-1">
-          <div className="glass-card p-10 bg-gradient-to-br from-brand-primary to-brand-secondary text-white relative overflow-hidden mb-8">
-            <div className="relative z-10">
-              <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-2">Available Balance</p>
-              <h2 className="text-5xl font-bold font-display mb-12">₹{profile?.balance.toFixed(2)}</h2>
-              <div className="flex items-center gap-2 text-xs font-bold opacity-80">
-                <Shield size={14} />
-                <span>Secure Wallet</span>
-              </div>
-            </div>
-            <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+        <div className="lg:col-span-1 space-y-8">
+          <div className="glass-card p-10 bg-gradient-to-br from-brand-primary/10 to-transparent border-brand-primary/20">
+            <p className="text-xs font-bold text-brand-primary uppercase tracking-[0.2em] mb-2">Current Balance</p>
+            <h2 className="text-5xl font-bold text-white mb-2">₹{profile?.balance.toFixed(2)}</h2>
+            <p className="text-gray-500 text-sm">Funds available for orders</p>
           </div>
 
           <div className="glass-card p-8">
-            <h3 className="text-lg font-bold mb-6">Payment Methods</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">Payment Methods</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
-                <div className="flex items-center gap-3">
-                  <CreditCard size={20} className="text-gray-500" />
-                  <span className="text-sm font-bold text-gray-500">Credit Card</span>
-                </div>
-                <span className="text-[10px] font-bold text-gray-600 uppercase">Coming Soon</span>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-brand-primary/10 border border-brand-primary/20">
-                <div className="flex items-center gap-3">
-                  <Wallet size={20} className="text-brand-primary" />
-                  <span className="text-sm font-bold text-white">Manual Deposit</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-brand-primary/20 flex items-center justify-center">
+                    <Smartphone size={20} className="text-brand-primary" />
+                  </div>
+                  <span className="text-sm font-bold text-white">UPI / QR Code</span>
                 </div>
                 <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">Active</span>
               </div>
@@ -729,15 +780,54 @@ const WalletPanel = () => {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="glass-card p-12 text-center border-dashed border-white/10 bg-transparent">
-            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8">
-              <ArrowUpRight size={32} className="text-gray-500" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="glass-card p-10 flex flex-col items-center text-center">
+              <h3 className="text-xl font-bold mb-6">Scan to Pay</h3>
+              <div className="w-48 h-48 bg-white p-4 rounded-2xl mb-6 shadow-2xl shadow-brand-primary/20">
+                <img 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=gujjusmm@upi&pn=GujjuSMM&am=0&cu=INR" 
+                  alt="QR Code" 
+                  className="w-full h-full"
+                />
+              </div>
+              <p className="text-sm text-gray-400 mb-2">Scan this QR to pay via any UPI app</p>
+              <p className="text-xs font-mono text-brand-primary">gujjusmm@upi</p>
             </div>
-            <h3 className="text-2xl font-bold mb-4">Add Funds</h3>
-            <p className="text-gray-500 mb-10 max-w-md mx-auto">
-              To add funds to your account, please contact our support team or use the manual deposit portal. We support USDT, BTC, and local bank transfers.
-            </p>
-            <button className="btn-modern btn-brand px-12 py-5 text-lg">Contact Support</button>
+
+            <div className="glass-card p-10">
+              <h3 className="text-xl font-bold mb-8 text-white">Submit Payment Proof</h3>
+              <form onSubmit={handleDepositRequest} className="space-y-6">
+                <div>
+                  <label className="label-modern">Amount Paid (₹)</label>
+                  <input 
+                    type="number" 
+                    className="input-modern" 
+                    placeholder="Enter amount"
+                    value={amount || ''}
+                    onChange={e => setAmount(Number(e.target.value))}
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="label-modern">Transaction ID / Ref No.</label>
+                  <input 
+                    type="text" 
+                    className="input-modern" 
+                    placeholder="Enter transaction ID"
+                    value={transactionId}
+                    onChange={e => setTransactionId(e.target.value)}
+                    required 
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="btn-modern btn-brand w-full py-4 font-bold"
+                >
+                  {loading ? 'Submitting...' : 'Submit for Approval'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -745,7 +835,169 @@ const WalletPanel = () => {
   );
 };
 
+const AdminOrders = () => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
+      setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
+  }, []);
+
+  const updateStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status });
+      toast.success('Order status updated');
+    } catch (e) {
+      toast.error('Failed to update status');
+    }
+  };
+
+  return (
+    <div className="glass-card overflow-hidden">
+      <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between">
+        <h3 className="text-xl font-bold">All User Orders</h3>
+        <Inbox size={20} className="text-gray-500" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-white/[0.02]">
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Order ID</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">User</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Service</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {loading ? (
+              <tr><td colSpan={5} className="px-8 py-12 text-center text-gray-500">Loading orders...</td></tr>
+            ) : orders.length === 0 ? (
+              <tr><td colSpan={5} className="px-8 py-12 text-center text-gray-500">No orders found</td></tr>
+            ) : (
+              orders.map(order => (
+                <tr key={order.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="px-8 py-6 font-mono text-[10px] text-gray-400">#{order.id.slice(-6).toUpperCase()}</td>
+                  <td className="px-8 py-6 text-sm text-white">{order.userId.slice(0, 8)}...</td>
+                  <td className="px-8 py-6 text-sm text-white">{order.serviceName}</td>
+                  <td className="px-8 py-6">
+                    <span className={`badge-modern status-${order.status}`}>{order.status}</span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <select 
+                      className="bg-surface-800 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none"
+                      value={order.status}
+                      onChange={(e) => updateStatus(order.id, e.target.value as Order['status'])}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const AdminDeposits = () => {
+  const [requests, setRequests] = useState<DepositRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'depositRequests'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DepositRequest)));
+      setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'depositRequests'));
+  }, []);
+
+  const handleApproval = async (request: DepositRequest, status: 'approved' | 'rejected') => {
+    try {
+      await updateDoc(doc(db, 'depositRequests', request.id), { status });
+      if (status === 'approved') {
+        await updateDoc(doc(db, 'users', request.userId), {
+          balance: increment(request.amount)
+        });
+        toast.success(`Approved ₹${request.amount} for ${request.userEmail}`);
+      } else {
+        toast.error('Request rejected');
+      }
+    } catch (e) {
+      toast.error('Failed to process request');
+    }
+  };
+
+  return (
+    <div className="glass-card overflow-hidden">
+      <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between">
+        <h3 className="text-xl font-bold">Deposit Requests</h3>
+        <Wallet size={20} className="text-gray-500" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-white/[0.02]">
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">User</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Amount</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Transaction ID</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {loading ? (
+              <tr><td colSpan={5} className="px-8 py-12 text-center text-gray-500">Loading requests...</td></tr>
+            ) : requests.length === 0 ? (
+              <tr><td colSpan={5} className="px-8 py-12 text-center text-gray-500">No requests found</td></tr>
+            ) : (
+              requests.map(req => (
+                <tr key={req.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="px-8 py-6 text-sm text-white">{req.userEmail}</td>
+                  <td className="px-8 py-6 text-sm font-bold text-brand-primary">₹{req.amount.toFixed(2)}</td>
+                  <td className="px-8 py-6 font-mono text-xs text-gray-400">{req.transactionId}</td>
+                  <td className="px-8 py-6">
+                    <span className={`badge-modern status-${req.status}`}>{req.status}</span>
+                  </td>
+                  <td className="px-8 py-6">
+                    {req.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleApproval(req, 'approved')}
+                          className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-all"
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          onClick={() => handleApproval(req, 'rejected')}
+                          className="bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-all"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel = () => {
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'orders' | 'deposits'>('services');
   const [category, setCategory] = useState('');
   const [name, setName] = useState('');
   const [price, setPrice] = useState(0);
@@ -804,55 +1056,83 @@ const AdminPanel = () => {
 
   return (
     <div className="p-6 md:p-12 max-w-7xl mx-auto">
-      <div className="mb-12">
-        <h1 className="text-4xl md:text-5xl font-bold mb-2">Admin Panel</h1>
-        <p className="text-gray-500">Manage your SMM services</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold mb-2">Admin Panel</h1>
+          <p className="text-gray-500">Master control for your SMM portal</p>
+        </div>
+        <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">
+          <button 
+            onClick={() => setActiveSubTab('services')}
+            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeSubTab === 'services' ? 'bg-brand-primary text-surface-950 shadow-lg shadow-brand-primary/20' : 'text-gray-400 hover:text-white'}`}
+          >
+            Services
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('orders')}
+            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeSubTab === 'orders' ? 'bg-brand-primary text-surface-950 shadow-lg shadow-brand-primary/20' : 'text-gray-400 hover:text-white'}`}
+          >
+            Orders
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('deposits')}
+            className={`px-6 py-3 rounded-xl text-sm font-bold transition-all ${activeSubTab === 'deposits' ? 'bg-brand-primary text-surface-950 shadow-lg shadow-brand-primary/20' : 'text-gray-400 hover:text-white'}`}
+          >
+            Deposits
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <div className="glass-card p-10">
-          <h3 className="text-xl font-bold mb-8">Add New Service</h3>
-          <form onSubmit={handleAdd} className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="label-modern">Category</label>
-                <input type="text" className="input-modern" value={category} onChange={e => setCategory(e.target.value)} required />
+      {activeSubTab === 'services' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="glass-card p-10">
+            <h3 className="text-xl font-bold mb-8">Add New Service</h3>
+            <form onSubmit={handleAdd} className="space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="label-modern">Category</label>
+                  <input type="text" className="input-modern" value={category} onChange={e => setCategory(e.target.value)} required />
+                </div>
+                <div>
+                  <label className="label-modern">Name</label>
+                  <input type="text" className="input-modern" value={name} onChange={e => setName(e.target.value)} required />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-6">
+                <div>
+                  <label className="label-modern">Price/1K</label>
+                  <input type="number" step="0.01" className="input-modern" value={price || ''} onChange={e => setPrice(Number(e.target.value))} required />
+                </div>
+                <div>
+                  <label className="label-modern">Min</label>
+                  <input type="number" className="input-modern" value={min || ''} onChange={e => setMin(Number(e.target.value))} required />
+                </div>
+                <div>
+                  <label className="label-modern">Max</label>
+                  <input type="number" className="input-modern" value={max || ''} onChange={e => setMax(Number(e.target.value))} required />
+                </div>
               </div>
               <div>
-                <label className="label-modern">Name</label>
-                <input type="text" className="input-modern" value={name} onChange={e => setName(e.target.value)} required />
+                <label className="label-modern">Description</label>
+                <textarea className="input-modern min-h-[100px]" value={description} onChange={e => setDescription(e.target.value)} />
               </div>
+              <button type="submit" disabled={loading} className="btn-modern btn-brand w-full py-5">
+                {loading ? 'Adding...' : 'Add Service'}
+              </button>
+            </form>
+          </div>
+          <div className="space-y-8">
+            <div className="glass-card p-10 bg-brand-primary/10 border-brand-primary/20">
+              <h3 className="text-xl font-bold mb-4">Quick Setup</h3>
+              <p className="text-sm text-gray-400 mb-8 leading-relaxed">Populate your panel with standard social media services instantly.</p>
+              <button onClick={handleSeed} disabled={loading} className="btn-modern btn-brand w-full py-5">Seed Default Services</button>
             </div>
-            <div className="grid grid-cols-3 gap-6">
-              <div>
-                <label className="label-modern">Price/1K</label>
-                <input type="number" step="0.01" className="input-modern" value={price || ''} onChange={e => setPrice(Number(e.target.value))} required />
-              </div>
-              <div>
-                <label className="label-modern">Min</label>
-                <input type="number" className="input-modern" value={min || ''} onChange={e => setMin(Number(e.target.value))} required />
-              </div>
-              <div>
-                <label className="label-modern">Max</label>
-                <input type="number" className="input-modern" value={max || ''} onChange={e => setMax(Number(e.target.value))} required />
-              </div>
-            </div>
-            <div>
-              <label className="label-modern">Description</label>
-              <textarea className="input-modern min-h-[100px]" value={description} onChange={e => setDescription(e.target.value)} />
-            </div>
-            <button type="submit" disabled={loading} className="btn-modern btn-brand w-full py-5">Add Service</button>
-          </form>
-        </div>
-
-        <div className="space-y-8">
-          <div className="glass-card p-10 bg-brand-primary/10 border-brand-primary/20">
-            <h3 className="text-xl font-bold mb-4">Quick Setup</h3>
-            <p className="text-sm text-gray-400 mb-8 leading-relaxed">Populate your panel with standard social media services instantly.</p>
-            <button onClick={handleSeed} disabled={loading} className="btn-modern btn-brand w-full py-5">Seed Default Services</button>
           </div>
         </div>
-      </div>
+      )}
+
+      {activeSubTab === 'orders' && <AdminOrders />}
+      {activeSubTab === 'deposits' && <AdminDeposits />}
     </div>
   );
 };
@@ -907,10 +1187,15 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
-  const login = async () => {
+  const login = async (method: 'anonymous' | 'google' = 'anonymous') => {
     setLoading(true);
     try {
-      await signInAnonymously(auth);
+      if (method === 'google') {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      } else {
+        await signInAnonymously(auth);
+      }
     } catch (e) {
       toast.error('Login failed');
     } finally {
@@ -934,6 +1219,13 @@ const AppContent = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [preSelectedServiceId, setPreSelectedServiceId] = useState<string | null>(null);
 
+  const handleTabChange = (tab: string, serviceId?: string) => {
+    setActiveTab(tab);
+    if (serviceId) {
+      setPreSelectedServiceId(serviceId);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-900 flex items-center justify-center">
@@ -948,7 +1240,7 @@ const AppContent = () => {
   return (
     <div className="min-h-screen bg-surface-900 flex">
       <div className="glow-mesh" />
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
       <main className="flex-1 md:ml-72 min-h-screen">
         <AnimatePresence mode="wait">
           <motion.div
@@ -958,11 +1250,8 @@ const AppContent = () => {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
           >
-            {activeTab === 'dashboard' && <Dashboard setActiveTab={(tab, serviceId) => {
-              setActiveTab(tab);
-              if (serviceId) setPreSelectedServiceId(serviceId);
-            }} />}
-            {activeTab === 'new-order' && <NewOrder setActiveTab={setActiveTab} preSelectedServiceId={preSelectedServiceId} onClearPreSelect={() => setPreSelectedServiceId(null)} />}
+            {activeTab === 'dashboard' && <Dashboard setActiveTab={handleTabChange} />}
+            {activeTab === 'new-order' && <NewOrder setActiveTab={handleTabChange} preSelectedServiceId={preSelectedServiceId} onClearPreSelect={() => setPreSelectedServiceId(null)} />}
             {activeTab === 'orders' && <OrderHistory />}
             {activeTab === 'wallet' && <WalletPanel />}
             {activeTab === 'admin' && <AdminPanel />}
