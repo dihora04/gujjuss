@@ -163,7 +163,6 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string, serviceId?: s
     setLoading(true);
     const defaultServices = [
       { category: 'Instagram', name: 'Instagram Followers [Indian - Real]', price: 80.00, min: 100, max: 10000, description: 'High quality Indian followers with profile pictures.' },
-      { category: 'Instagram', name: 'Instagram Followers [USA - HQ]', price: 120.00, min: 100, max: 20000, description: 'High quality USA based followers.' },
       { category: 'Instagram', name: 'Instagram Followers [Global - Cheap]', price: 45.00, min: 500, max: 50000, description: 'Budget friendly global followers.' },
       { category: 'Instagram', name: 'Instagram Likes [Real - Fast]', price: 25.00, min: 50, max: 10000, description: 'Real likes from active accounts.' },
       { category: 'Instagram', name: 'Instagram Views [Instant]', price: 10.00, min: 100, max: 100000, description: 'Instant views for your reels and videos.' },
@@ -173,8 +172,10 @@ const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string, serviceId?: s
       { category: 'Instagram', name: '317 PREMIUM INDIAN Comments [Custom] [No Drop] [SuperFast] [Lifetime Refill]', price: 45.99, min: 10, max: 1000, description: 'Premium Indian custom comments with lifetime refill.' },
       { category: 'Instagram', name: '650 - Instagram Custom Comment [Indian] [High Quality] [Drop - No]', price: 43.20, min: 10, max: 1000, description: 'High quality Indian custom comments, no drop.' },
       { category: 'Demo', name: 'Free Demo Service', price: 0.00, min: 10, max: 100, description: 'Test our system with this free demo service.' },
-      { category: 'YouTube', name: 'YouTube Views [Non-Drop]', price: 250.00, min: 500, max: 100000, description: 'High retention YouTube views.' },
-      { category: 'YouTube', name: 'YouTube Subscribers [HQ]', price: 1500.00, min: 100, max: 5000, description: 'High quality YouTube subscribers.' },
+      { category: 'YouTube', name: 'YouTube Subscribers [2/1]', price: 2000.00, min: 10, max: 5000, description: 'High quality YouTube subscribers.' },
+      { category: 'YouTube', name: 'YouTube Views [100/1k]', price: 100.00, min: 100, max: 100000, description: 'High retention YouTube views.' },
+      { category: 'YouTube', name: 'YouTube Shares [0.10/1k]', price: 0.10, min: 100, max: 100000, description: 'Budget friendly YouTube shares.' },
+      { category: 'YouTube', name: 'YouTube Shares [10/100]', price: 100.00, min: 100, max: 100000, description: 'High quality YouTube shares.' },
       { category: 'YouTube', name: 'YouTube Watch Time [4000 Hours]', price: 4500.00, min: 1000, max: 4000, description: 'Monetization watch time package.' },
       { category: 'TikTok', name: 'TikTok Followers [Fast]', price: 180.00, min: 100, max: 50000, description: 'Fast delivery TikTok followers.' },
       { category: 'TikTok', name: 'TikTok Likes [Instant]', price: 60.00, min: 100, max: 20000, description: 'Instant TikTok likes.' },
